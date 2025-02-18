@@ -475,8 +475,32 @@ class Separator:
 
     def download_model_files(self, model_filename):
         """
-        This method downloads the model files for a given model filename, if they are not already present.
-        Returns tuple of (model_filename, model_type, model_friendly_name, model_path, yaml_config_filename)
+        Download and ensure all necessary model files for a given model are present on disk.
+        
+        This method searches through the supported model files to identify a model by matching the
+        provided filename against recorded filenames and download URLs. Once a match is found, it downloads
+        all associated files from multiple repository URL fallbacks. For MDXC models, YAML configuration files
+        are downloaded using a special URL path and are tracked separately. The method also updates the instance's
+        model friendly name and logs relevant messages, including VIP-specific notifications when applicable.
+        
+        Parameters:
+            model_filename (str): The filename (or part of it) identifying the target model to download.
+        
+        Returns:
+            tuple: A tuple containing:
+                - model_filename (str): The provided model file name.
+                - model_type (str): The type/category of the model (e.g., "MDX", "Demucs", "MDXC").
+                - model_friendly_name (str): A human-readable name for the model.
+                - model_path (str): The local file system path where the model file is or will be stored.
+                - yaml_config_filename (str or None): The filename of the YAML configuration file for MDXC models, or None if not applicable.
+        
+        Raises:
+            ValueError: If the model file is not found in the list of supported model files.
+        
+        Side Effects:
+            Downloads the required model files (and YAML configuration files for MDXC models) into the directory specified by self.model_file_dir.
+            Updates self.model_friendly_name with the identified friendly name of the model.
+            Logs debug information and outputs VIP model notifications when necessary.
         """
         model_path = os.path.join(self.model_file_dir, f"{model_filename}")
 
@@ -536,8 +560,18 @@ class Separator:
 
     def _download_file_with_fallbacks(self, urls, download_path):
         """
-        Attempts to download a file from a list of URLs, trying each one in sequence.
-        Raises RuntimeError if all attempts fail.
+        Attempts to download a file from multiple URLs with fallback.
+        
+        This method iterates over a list of URLs and tries to download the file using each URL in sequence by invoking the
+        download_file_if_not_exists method. If a download attempt fails, it logs a debug message with the error and proceeds to try
+        the next URL. If all the URLs fail to provide a successful download, the method raises a RuntimeError.
+        
+        Parameters:
+            urls (List[str]): A list of URLs to attempt the download from.
+            download_path (str): The destination file path where the downloaded file should be saved.
+        
+        Raises:
+            RuntimeError: If the file fails to download from all provided URLs.
         """
         for url in urls:
             try:
@@ -549,8 +583,23 @@ class Separator:
 
     def load_model_data_from_yaml(self, yaml_config_filename):
         """
-        This method loads model-specific parameters from the YAML file for that model.
-        The parameters in the YAML are critical to inferencing, as they need to match whatever was used during training.
+        Load model parameters from a YAML configuration file.
+        
+        This method reads and parses model-specific parameters that are critical to ensuring
+        inference uses the same settings as were used during training. If the provided
+        `yaml_config_filename` does not point to an existing file, it is assumed to be relative
+        to the model file directory specified by `self.model_file_dir`. Additionally, if the
+        file path contains the substring "roformer", the returned dictionary includes the key
+        `"is_roformer"` set to `True`.
+        
+        Parameters:
+            yaml_config_filename (str): The filename or full path of the YAML configuration file.
+        
+        Returns:
+            dict: A dictionary containing the model parameters loaded from the YAML file.
+        
+        Raises:
+            Exception: Propagates any exceptions raised during file reading or YAML parsing.
         """
         # Verify if the YAML filename includes a full path or just the filename
         if not os.path.exists(yaml_config_filename):
