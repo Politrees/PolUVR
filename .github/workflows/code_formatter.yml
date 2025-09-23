@@ -49,16 +49,16 @@ jobs:
         if: steps.changes.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v7
         with:
-          commit-message: "style(ruff): автоматическое форматирование кода"
-          title: "🎨 Автоматическое форматирование кода"
+          commit-message: "style(ruff): automatic code formatting"
+          title: "🎨 Automatic Code Formatting"
           body: |
-            Этот Pull Request был создан автоматически GitHub Actions для применения единых стилей оформления кода.
+            This Pull Request was created automatically by GitHub Actions to apply unified code style standards.
 
-            🔧 Форматирование выполнено с помощью [`Ruff`](https://github.com/astral-sh/ruff):
-            > - Автоматическое исправление стиля и линтинга (`ruff check --fix`)
-            > - Применение форматтера (`ruff format`)
+            🔧 Formatting performed using [`Ruff`](https://github.com/astral-sh/ruff):
+            > - Automatic style and linting fixes (`ruff check --fix`)
+            > - Formatter applied (`ruff format`)
 
-            ✨ Изменения затрагивают только стиль кода, логика работы не изменена.
-            > Целевая версия Python: **3.10**
+            ✨ Changes only affect code style, program logic remains unchanged.
+            > Target Python version: **3.10**
           branch: "formatter/${{ github.ref_name }}"
           delete-branch: true
