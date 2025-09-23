@@ -41,7 +41,7 @@ def main():
     print(f"Experiment {name}")
 
     if args.musdb is None and args.rank == 0:
-        print("You must provide the path to the MusDB dataset with the --musdb flag. " "To download the MusDB dataset, see https://sigsep.github.io/datasets/musdb.html.", file=sys.stderr)
+        print("You must provide the path to the MusDB dataset with the --musdb flag. To download the MusDB dataset, see https://sigsep.github.io/datasets/musdb.html.", file=sys.stderr)
         sys.exit(1)
 
     eval_folder = args.evals / name
@@ -110,7 +110,7 @@ def main():
 
     try:
         saved = th.load(checkpoint, map_location="cpu")
-    except IOError:
+    except OSError:
         saved = SavedState()
     else:
         model.load_state_dict(saved.last_state)
@@ -161,7 +161,7 @@ def main():
 
     best_loss = float("inf")
     for epoch, metrics in enumerate(saved.metrics):
-        print(f"Epoch {epoch:03d}: " f"train={metrics['train']:.8f} " f"valid={metrics['valid']:.8f} " f"best={metrics['best']:.4f} " f"duration={human_seconds(metrics['duration'])}")
+        print(f"Epoch {epoch:03d}: train={metrics['train']:.8f} valid={metrics['valid']:.8f} best={metrics['best']:.4f} duration={human_seconds(metrics['duration'])}")
         best_loss = metrics["best"]
 
     if args.world_size > 1:
@@ -173,7 +173,7 @@ def main():
         begin = time.time()
         model.train()
         train_loss = train_model(
-            epoch, train_set, dmodel, criterion, optimizer, augment, batch_size=args.batch_size, device=device, repeat=args.repeat, seed=args.seed, workers=args.workers, world_size=args.world_size
+            epoch, train_set, dmodel, criterion, optimizer, augment, batch_size=args.batch_size, device=device, repeat=args.repeat, seed=args.seed, workers=args.workers, world_size=args.world_size,
         )
         model.eval()
         valid_loss = validate_model(epoch, valid_set, model, criterion, device=device, rank=args.rank, split=args.split_valid, world_size=args.world_size)
@@ -192,7 +192,7 @@ def main():
             th.save(saved, checkpoint_tmp)
             checkpoint_tmp.rename(checkpoint)
 
-        print(f"Epoch {epoch:03d}: " f"train={train_loss:.8f} valid={valid_loss:.8f} best={best_loss:.4f} " f"duration={human_seconds(duration)}")
+        print(f"Epoch {epoch:03d}: train={train_loss:.8f} valid={valid_loss:.8f} best={best_loss:.4f} duration={human_seconds(duration)}")
 
     del dmodel
     model.load_state_dict(saved.best_state)

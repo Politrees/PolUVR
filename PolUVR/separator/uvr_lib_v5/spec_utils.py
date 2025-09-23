@@ -1,13 +1,15 @@
+import io
+import math
+import platform
+import traceback
+
 import audioread
 import librosa
 import numpy as np
 import soundfile as sf
-import math
-import platform
-import traceback
-from PolUVR.separator.uvr_lib_v5 import pyrb
 from scipy.signal import correlate, hilbert
-import io
+
+from PolUVR.separator.uvr_lib_v5 import pyrb
 
 OPERATING_SYSTEM = platform.system()
 SYSTEM_ARCH = platform.platform()
@@ -48,8 +50,7 @@ AVERAGE = "Average"
 
 
 def crop_center(h1, h2):
-    """
-    This function crops the center of the first input tensor to match the size of the second input tensor.
+    """This function crops the center of the first input tensor to match the size of the second input tensor.
     It is used to ensure that the two tensors have the same size in the time dimension.
     """
     h1_shape = h1.size()
@@ -59,7 +60,7 @@ def crop_center(h1, h2):
     if h1_shape[3] == h2_shape[3]:
         return h1
     # If the time dimension of the first tensor is smaller, raise an error
-    elif h1_shape[3] < h2_shape[3]:
+    if h1_shape[3] < h2_shape[3]:
         raise ValueError("h1_shape[3] must be greater than h2_shape[3]")
 
     # Calculate the start and end indices for cropping
@@ -72,8 +73,7 @@ def crop_center(h1, h2):
 
 
 def preprocess(X_spec):
-    """
-    This function preprocesses a spectrogram by separating it into magnitude and phase components.
+    """This function preprocesses a spectrogram by separating it into magnitude and phase components.
     This is a common preprocessing step in audio processing tasks.
     """
     X_mag = np.abs(X_spec)
@@ -83,8 +83,7 @@ def preprocess(X_spec):
 
 
 def make_padding(width, cropsize, offset):
-    """
-    This function calculates the padding needed to make the width of an image divisible by the crop size.
+    """This function calculates the padding needed to make the width of an image divisible by the crop size.
     It is used in the process of splitting an image into smaller patches.
     """
     left = offset
@@ -105,6 +104,7 @@ def normalize(wave, max_peak=1.0, min_peak=None):
 
     Returns:
         array-like: Normalized or original waveform.
+
     """
     maxv = np.abs(wave).max()
     if maxv > max_peak:
@@ -116,16 +116,17 @@ def normalize(wave, max_peak=1.0, min_peak=None):
 
 
 def auto_transpose(audio_array: np.ndarray):
-    """
-    Ensure that the audio array is in the (channels, samples) format.
+    """Ensure that the audio array is in the (channels, samples) format.
 
-    Parameters:
+    Parameters
+    ----------
         audio_array (ndarray): Input audio array.
 
-    Returns:
+    Returns
+    -------
         ndarray: Transposed audio array if necessary.
-    """
 
+    """
     # If the second dimension is 2 (indicating stereo channels), transpose the array
     if audio_array.shape[1] == 2:
         return audio_array.T
@@ -138,8 +139,7 @@ def write_array_to_mem(audio_data, subtype):
         sf.write(audio_buffer, audio_data, 44100, subtype=subtype, format="WAV")
         audio_buffer.seek(0)
         return audio_buffer
-    else:
-        return audio_data
+    return audio_data
 
 
 def spectrogram_to_image(spec, mode="magnitude"):
@@ -193,7 +193,7 @@ def merge_artifacts(y_mask, thres=0.01, min_range=64, fade_size=32):
             start_idx = start_idx[artifact_idx]
             end_idx = end_idx[artifact_idx]
             old_e = None
-            for s, e in zip(start_idx, end_idx):
+            for s, e in zip(start_idx, end_idx, strict=False):
                 if old_e is not None and s - old_e < fade_size:
                     s = old_e - fade_size * 2
 
@@ -232,13 +232,13 @@ def align_wave_head_and_tail(a, b):
 def convert_channels(spec, mp, band):
     cc = mp.param["band"][band].get("convert_channels")
 
-    if "mid_side_c" == cc:
+    if cc == "mid_side_c":
         spec_left = np.add(spec[0], spec[1] * 0.25)
         spec_right = np.subtract(spec[1], spec[0] * 0.25)
-    elif "mid_side" == cc:
+    elif cc == "mid_side":
         spec_left = np.add(spec[0], spec[1]) / 2
         spec_right = np.subtract(spec[0], spec[1])
-    elif "stereo_n" == cc:
+    elif cc == "stereo_n":
         spec_left = np.add(spec[0], spec[1] * 0.25) / 0.9375
         spec_right = np.add(spec[1], spec[0] * 0.25) / 0.9375
     else:
@@ -266,15 +266,14 @@ def combine_spectrograms(specs, mp, is_v51_model=False):
     if mp.param["pre_filter_start"] > 0:
         if is_v51_model:
             spec_c *= get_lp_filter_mask(spec_c.shape[1], mp.param["pre_filter_start"], mp.param["pre_filter_stop"])
+        elif bands_n == 1:
+            spec_c = fft_lp_filter(spec_c, mp.param["pre_filter_start"], mp.param["pre_filter_stop"])
         else:
-            if bands_n == 1:
-                spec_c = fft_lp_filter(spec_c, mp.param["pre_filter_start"], mp.param["pre_filter_stop"])
-            else:
-                gp = 1
-                for b in range(mp.param["pre_filter_start"] + 1, mp.param["pre_filter_stop"]):
-                    g = math.pow(10, -(b - mp.param["pre_filter_start"]) * (3.5 - gp) / 20.0)
-                    gp = g
-                    spec_c[:, b, :] *= g
+            gp = 1
+            for b in range(mp.param["pre_filter_start"] + 1, mp.param["pre_filter_stop"]):
+                g = math.pow(10, -(b - mp.param["pre_filter_start"]) * (3.5 - gp) / 20.0)
+                gp = g
+                spec_c[:, b, :] *= g
 
     return np.asfortranarray(spec_c)
 
@@ -321,19 +320,18 @@ def spectrogram_to_wave(spec, hop_length=1024, mp={}, band=0, is_v51_model=True)
 
     if is_v51_model:
         cc = mp.param["band"][band].get("convert_channels")
-        if "mid_side_c" == cc:
+        if cc == "mid_side_c":
             return np.asfortranarray([np.subtract(wave_left / 1.0625, wave_right / 4.25), np.add(wave_right / 1.0625, wave_left / 4.25)])
-        elif "mid_side" == cc:
+        if cc == "mid_side":
             return np.asfortranarray([np.add(wave_left, wave_right / 2), np.subtract(wave_left, wave_right / 2)])
-        elif "stereo_n" == cc:
+        if cc == "stereo_n":
             return np.asfortranarray([np.subtract(wave_left, wave_right * 0.25), np.subtract(wave_right, wave_left * 0.25)])
-    else:
-        if mp.param["reverse"]:
-            return np.asfortranarray([np.flip(wave_left), np.flip(wave_right)])
-        elif mp.param["mid_side"]:
-            return np.asfortranarray([np.add(wave_left, wave_right / 2), np.subtract(wave_left, wave_right / 2)])
-        elif mp.param["mid_side_b2"]:
-            return np.asfortranarray([np.add(wave_right / 1.25, 0.4 * wave_left), np.subtract(wave_left / 1.25, 0.4 * wave_right)])
+    elif mp.param["reverse"]:
+        return np.asfortranarray([np.flip(wave_left), np.flip(wave_right)])
+    elif mp.param["mid_side"]:
+        return np.asfortranarray([np.add(wave_left, wave_right / 2), np.subtract(wave_left, wave_right / 2)])
+    elif mp.param["mid_side_b2"]:
+        return np.asfortranarray([np.add(wave_right / 1.25, 0.4 * wave_left), np.subtract(wave_left / 1.25, 0.4 * wave_right)])
 
     return np.asfortranarray([wave_left, wave_right])
 
@@ -456,13 +454,13 @@ def wave_to_spectrogram_old(wave, hop_length, n_fft):
 
 
 def mirroring(a, spec_m, input_high_end, mp):
-    if "mirroring" == a:
+    if a == "mirroring":
         mirror = np.flip(np.abs(spec_m[:, mp.param["pre_filter_start"] - 10 - input_high_end.shape[1] : mp.param["pre_filter_start"] - 10, :]), 1)
         mirror = mirror * np.exp(1.0j * np.angle(input_high_end))
 
         return np.where(np.abs(input_high_end) <= np.abs(mirror), input_high_end, mirror)
 
-    if "mirroring2" == a:
+    if a == "mirroring2":
         mirror = np.flip(np.abs(spec_m[:, mp.param["pre_filter_start"] - 10 - input_high_end.shape[1] : mp.param["pre_filter_start"] - 10, :]), 1)
         mi = np.multiply(mirror, input_high_end * 1.7)
 
@@ -595,9 +593,9 @@ def ensembling(a, inputs, is_wavs=False):
             input = input[:, :, :ln]
             inputs[i] = inputs[i][:, :, :ln]
 
-        if MIN_SPEC == a:
+        if a == MIN_SPEC:
             input = np.where(np.abs(inputs[i]) <= np.abs(input), inputs[i], input)
-        if MAX_SPEC == a:
+        if a == MAX_SPEC:
             #input = np.array(np.where(np.greater_equal(np.abs(inputs[i]), np.abs(input)), inputs[i], input), dtype=object)
             input = np.where(np.abs(inputs[i]) >= np.abs(input), inputs[i], input)
             #max_spec = np.array([np.where(np.greater_equal(np.abs(inputs[i]), np.abs(input)), s, specs[0]) for s in specs[1:]], dtype=object)[-1]
@@ -653,7 +651,7 @@ def ensemble_inputs(audio_input, algorithm, is_normalization, wav_type_set, save
 
 def to_shape(x, target_shape):
     padding_list = []
-    for x_dim, target_dim in zip(x.shape, target_shape):
+    for x_dim, target_dim in zip(x.shape, target_shape, strict=False):
         pad_value = target_dim - x_dim
         pad_tuple = (0, pad_value)
         padding_list.append(pad_tuple)
@@ -664,7 +662,7 @@ def to_shape(x, target_shape):
 def to_shape_minimize(x: np.ndarray, target_shape):
 
     padding_list = []
-    for x_dim, target_dim in zip(x.shape, target_shape):
+    for x_dim, target_dim in zip(x.shape, target_shape, strict=False):
         pad_value = target_dim - x_dim
         pad_tuple = (0, pad_value)
         padding_list.append(pad_tuple)
@@ -673,8 +671,7 @@ def to_shape_minimize(x: np.ndarray, target_shape):
 
 
 def detect_leading_silence(audio, sr, silence_threshold=0.007, frame_length=1024):
-    """
-    Detect silence at the beginning of an audio signal.
+    """Detect silence at the beginning of an audio signal.
 
     :param audio: np.array, audio signal
     :param sr: int, sample rate
@@ -683,7 +680,6 @@ def detect_leading_silence(audio, sr, silence_threshold=0.007, frame_length=1024
 
     :return: float, duration of the leading silence in milliseconds
     """
-
     if len(audio.shape) == 2:
         # If stereo, pick the channel with more energy to determine the silence
         channel = np.argmax(np.sum(np.abs(audio), axis=1))
@@ -697,8 +693,7 @@ def detect_leading_silence(audio, sr, silence_threshold=0.007, frame_length=1024
 
 
 def adjust_leading_silence(target_audio, reference_audio, silence_threshold=0.01, frame_length=1024):
-    """
-    Adjust the leading silence of the target_audio to match the leading silence of the reference_audio.
+    """Adjust the leading silence of the target_audio to match the leading silence of the reference_audio.
 
     :param target_audio: np.array, audio signal that will have its silence adjusted
     :param reference_audio: np.array, audio signal used as a reference
@@ -731,7 +726,7 @@ def adjust_leading_silence(target_audio, reference_audio, silence_threshold=0.01
         target_silence_end_p = (target_silence_end / 44100) * 1000
         silence_difference_p = ref_silence_end_p - target_silence_end_p
         print("silence_difference: ", silence_difference_p)
-    except Exception as e:
+    except Exception:
         pass
 
     if silence_difference > 0:  # Add silence to target_audio
@@ -740,13 +735,13 @@ def adjust_leading_silence(target_audio, reference_audio, silence_threshold=0.01
         else:  # mono
             silence_to_add = np.zeros(silence_difference)
         return np.hstack((silence_to_add, target_audio))
-    elif silence_difference < 0:  # Remove silence from target_audio
+    if silence_difference < 0:  # Remove silence from target_audio
         if len(target_audio.shape) == 2:  # stereo
             return target_audio[:, -silence_difference:]
-        else:  # mono
-            return target_audio[-silence_difference:]
-    else:  # No adjustment needed
-        return target_audio
+        # mono
+        return target_audio[-silence_difference:]
+    # No adjustment needed
+    return target_audio
 
 
 def match_array_shapes(array_1: np.ndarray, array_2: np.ndarray, is_swap=False):
@@ -1059,10 +1054,10 @@ def align_audio(
 
         if align_window:
             wav_sub = time_correction(
-                wav1, wav2_aligned, seconds_length, align_window=align_window, db_analysis=db_analysis, progress_bar=progress_bar, unique_sources=unique_sources, phase_shifts=phase_shifts
+                wav1, wav2_aligned, seconds_length, align_window=align_window, db_analysis=db_analysis, progress_bar=progress_bar, unique_sources=unique_sources, phase_shifts=phase_shifts,
             )
             wav_sub_size = np.abs(wav_sub).mean()
-            sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{wav_sub_size: wav_sub}}
+            sub_mapper_big_mapper = {**sub_mapper_big_mapper, wav_sub_size: wav_sub}
         else:
             wav2_aligned = wav2_aligned * np.power(10, db_analysis[0] / 20)
             db_range = db_analysis[1]
@@ -1072,7 +1067,7 @@ def align_audio(
                 s_adjusted = wav2_aligned * (10 ** (db_adjustment / 20))
                 wav_sub = wav1 - s_adjusted
                 wav_sub_size = np.abs(wav_sub).mean()
-                sub_mapper_big_mapper = {**sub_mapper_big_mapper, **{wav_sub_size: wav_sub}}
+                sub_mapper_big_mapper = {**sub_mapper_big_mapper, wav_sub_size: wav_sub}
 
         # print(sub_mapper_big_mapper.keys(), min(sub_mapper_big_mapper.keys()))
 
@@ -1089,7 +1084,7 @@ def align_audio(
     # print('Final: ', np.abs(wav_sub).mean())
     wav_sub = np.clip(wav_sub, -1, +1)
 
-    command_Text(f"Saving inverted track... ")
+    command_Text("Saving inverted track... ")
 
     if is_save_aligned or is_spec_match:
         wav1 = match_mono_array_shapes(wav1, wav_sub) if is_mono else match_array_shapes(wav1, wav_sub, is_swap=True)
@@ -1233,7 +1228,7 @@ def time_correction(mix: np.ndarray, instrumental: np.ndarray, seconds_length, a
         # Normalize the result by the overlap count
         sub = np.where(divider > 1e-6, sub / divider, sub)
         sub_size = np.abs(sub).mean()
-        sub_mapper = {**sub_mapper, **{sub_size: sub}}
+        sub_mapper = {**sub_mapper, sub_size: sub}
 
     # print("SUB_LEN", len(list(sub_mapper.values())))
 

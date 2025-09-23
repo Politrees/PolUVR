@@ -8,16 +8,15 @@ A repo can either be the main remote repository stored in AWS, or a local reposi
 with your own models.
 """
 
+import typing as tp
 from hashlib import sha256
 from pathlib import Path
-import typing as tp
 
 import torch
 import yaml
 
 from .apply import BagOfModels, Model
 from .states import load_model
-
 
 AnyModel = tp.Union[Model, BagOfModels]
 
@@ -36,21 +35,21 @@ def check_checksum(path: Path, checksum: str):
             sha.update(buf)
     actual_checksum = sha.hexdigest()[: len(checksum)]
     if actual_checksum != checksum:
-        raise ModelLoadingError(f"Invalid checksum for file {path}, " f"expected {checksum} but got {actual_checksum}")
+        raise ModelLoadingError(f"Invalid checksum for file {path}, expected {checksum} but got {actual_checksum}")
 
 
 class ModelOnlyRepo:
     """Base class for all model only repos."""
 
     def has_model(self, sig: str) -> bool:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_model(self, sig: str) -> Model:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class RemoteRepo(ModelOnlyRepo):
-    def __init__(self, models: tp.Dict[str, str]):
+    def __init__(self, models: dict[str, str]):
         self._models = models
 
     def has_model(self, sig: str) -> bool:
@@ -142,5 +141,4 @@ class AnyModelRepo:
         # print('name_or_sig: ', name_or_sig)
         if self.model_repo.has_model(name_or_sig):
             return self.model_repo.get_model(name_or_sig)
-        else:
-            return self.bag_repo.get_model(name_or_sig)
+        return self.bag_repo.get_model(name_or_sig)

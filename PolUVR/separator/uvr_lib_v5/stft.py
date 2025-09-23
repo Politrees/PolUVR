@@ -2,8 +2,7 @@ import torch
 
 
 class STFT:
-    """
-    This class performs the Short-Time Fourier Transform (STFT) and its inverse (ISTFT).
+    """This class performs the Short-Time Fourier Transform (STFT) and its inverse (ISTFT).
     These functions are essential for converting the audio between the time domain and the frequency domain,
     which is a crucial aspect of audio processing in neural networks.
     """
@@ -19,7 +18,7 @@ class STFT:
 
     def __call__(self, input_tensor):
         # Determine if the input tensor's device is not a standard computing device (i.e., not CPU or CUDA).
-        is_non_standard_device = not input_tensor.device.type in ["cuda", "cpu"]
+        is_non_standard_device = input_tensor.device.type not in ["cuda", "cpu"]
 
         # If on a non-standard device, temporarily move the tensor to CPU for processing.
         if is_non_standard_device:
@@ -45,7 +44,7 @@ class STFT:
 
         # Reshape the output to restore the original batch and channel dimensions, while keeping the newly formed frequency and time dimensions.
         final_output = permuted_stft_output.reshape([*batch_dimensions, channel_dim, 2, -1, permuted_stft_output.shape[-1]]).reshape(
-            [*batch_dimensions, channel_dim * 2, -1, permuted_stft_output.shape[-1]]
+            [*batch_dimensions, channel_dim * 2, -1, permuted_stft_output.shape[-1]],
         )
 
         # If the original tensor was on a non-standard device, move the processed tensor back to that device.
@@ -56,8 +55,7 @@ class STFT:
         return final_output[..., : self.dim_f, :]
 
     def pad_frequency_dimension(self, input_tensor, batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins):
-        """
-        Adds zero padding to the frequency dimension of the input tensor.
+        """Adds zero padding to the frequency dimension of the input tensor.
         """
         # Create a padding tensor for the frequency dimension
         freq_padding = torch.zeros([*batch_dimensions, channel_dim, num_freq_bins - freq_dim, time_dim]).to(input_tensor.device)
@@ -78,8 +76,7 @@ class STFT:
         return batch_dimensions, channel_dim, freq_dim, time_dim, num_freq_bins
 
     def prepare_for_istft(self, padded_tensor, batch_dimensions, channel_dim, num_freq_bins, time_dim):
-        """
-        Prepares the tensor for Inverse Short-Time Fourier Transform (ISTFT) by reshaping
+        """Prepares the tensor for Inverse Short-Time Fourier Transform (ISTFT) by reshaping
         and creating a complex tensor from the real and imaginary parts.
         """
         # Reshape the tensor to separate real and imaginary parts and prepare for ISTFT.
@@ -98,7 +95,7 @@ class STFT:
 
     def inverse(self, input_tensor):
         # Determine if the input tensor's device is not a standard computing device (i.e., not CPU or CUDA).
-        is_non_standard_device = not input_tensor.device.type in ["cuda", "cpu"]
+        is_non_standard_device = input_tensor.device.type not in ["cuda", "cpu"]
 
         # If on a non-standard device, temporarily move the tensor to CPU for processing.
         if is_non_standard_device:

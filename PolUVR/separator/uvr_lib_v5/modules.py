@@ -1,5 +1,5 @@
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class TFC(nn.Module):
@@ -13,7 +13,7 @@ class TFC(nn.Module):
                     nn.Conv2d(in_channels=c, out_channels=c, kernel_size=k, stride=1, padding=k // 2),
                     norm(c),
                     nn.ReLU(),
-                )
+                ),
             )
 
     def forward(self, x):
@@ -33,7 +33,7 @@ class DenseTFC(nn.Module):
                     nn.Conv2d(in_channels=c, out_channels=c, kernel_size=k, stride=1, padding=k // 2),
                     norm(c),
                     nn.ReLU(),
-                )
+                ),
             )
 
     def forward(self, x):
@@ -56,7 +56,7 @@ class TFC_TDF(nn.Module):
                 self.tdf = nn.Sequential(
                     nn.Linear(f, f, bias=bias),
                     norm(c),
-                    nn.ReLU()
+                    nn.ReLU(),
                 )
             else:
                 self.tdf = nn.Sequential(
@@ -65,7 +65,7 @@ class TFC_TDF(nn.Module):
                     nn.ReLU(),
                     nn.Linear(f // bn, f, bias=bias),
                     norm(c),
-                    nn.ReLU()
+                    nn.ReLU(),
                 )
 
     def forward(self, x):

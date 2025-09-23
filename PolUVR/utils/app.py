@@ -1,15 +1,24 @@
+import gc
+import logging
 import os
 import re
-import gc
-import sys
-import torch
 import shutil
-import logging
 import subprocess
+import sys
+
 import gradio as gr
+import torch
+from UVR_resources import (
+    FORMATS,
+    MDX23C_MODELS,
+    MDXNET_MODELS,
+    ROFORMER_MODELS,
+    STEMS,
+    VR_ARCH_MODELS,
+    DEMUCS_v4_MODELS,
+)
 
 from PolUVR.separator import Separator
-from UVR_resources import FORMATS, STEMS, DEMUCS_v4_MODELS, VR_ARCH_MODELS, MDXNET_MODELS, MDX23C_MODELS, ROFORMER_MODELS
 
 # Constants
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -100,7 +109,7 @@ def display_leaderboard(list_filter, list_limit):
             ["PolUVR", "-l", f"--list_filter={list_filter}", f"--list_limit={list_limit}"],
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
 
         if result.returncode != 0:
@@ -502,7 +511,7 @@ def PolUVR_UI(model_dir="/tmp/PolUVR-models/", output_dir="output"):
                         Use ONLY the specified keys (NAME, STEM, MODEL) to avoid corrupting the files. 
                         Do NOT add any extra text or characters outside these keys, or do so with caution.
                         </div>
-                        """
+                        """,
                     )
                     rename_stems = gr.Textbox(value="NAME_(STEM)_MODEL", label="Rename Stems", placeholder="NAME_(STEM)_MODEL")
 
@@ -538,11 +547,11 @@ def PolUVR_UI(model_dir="/tmp/PolUVR-models/", output_dir="output"):
             roformer_norm_threshold,
             roformer_amp_threshold,
             roformer_batch_size,
-            rename_stems
+            rename_stems,
         ],
         outputs=roformer_stems,
         show_progress_on=roformer_audio,
-        api_name=False
+        api_name=False,
     )
     mdx23c_button.click(
         run_mdx23c_separation,
@@ -559,11 +568,11 @@ def PolUVR_UI(model_dir="/tmp/PolUVR-models/", output_dir="output"):
             mdx23c_norm_threshold,
             mdx23c_amp_threshold,
             mdx23c_batch_size,
-            rename_stems
+            rename_stems,
         ],
         outputs=mdx23c_stems,
         show_progress_on=mdx23c_audio,
-        api_name=False
+        api_name=False,
     )
     mdx_button.click(
         run_mdx_separation,
@@ -580,11 +589,11 @@ def PolUVR_UI(model_dir="/tmp/PolUVR-models/", output_dir="output"):
             mdx_norm_threshold,
             mdx_amp_threshold,
             mdx_batch_size,
-            rename_stems
+            rename_stems,
         ],
         outputs=mdx_stems,
         show_progress_on=mdx_audio,
-        api_name=False
+        api_name=False,
     )
     vr_button.click(
         run_vr_separation,
@@ -603,11 +612,11 @@ def PolUVR_UI(model_dir="/tmp/PolUVR-models/", output_dir="output"):
             vr_norm_threshold,
             vr_amp_threshold,
             vr_batch_size,
-            rename_stems
+            rename_stems,
         ],
         outputs=vr_stems,
         show_progress_on=vr_audio,
-        api_name=False
+        api_name=False,
     )
     demucs_button.click(
         run_demucs_separation,
@@ -623,11 +632,11 @@ def PolUVR_UI(model_dir="/tmp/PolUVR-models/", output_dir="output"):
             demucs_output_format,
             demucs_norm_threshold,
             demucs_amp_threshold,
-            rename_stems
+            rename_stems,
         ],
         outputs=demucs_stems,
         show_progress_on=demucs_audio,
-        api_name=False
+        api_name=False,
     )
 
 
@@ -636,7 +645,7 @@ def main():
     with gr.Blocks(
         title="🎵 PolUVR 🎵",
         css="footer{display:none !important}",
-        theme=gr.themes.Default(spacing_size="sm", radius_size="lg")
+        theme=gr.themes.Default(spacing_size="sm", radius_size="lg"),
     ) as app:
         gr.HTML("<h1><center> 🎵 PolUVR 🎵 </center></h1>")
         PolUVR_UI()

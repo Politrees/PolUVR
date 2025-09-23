@@ -1,10 +1,12 @@
 import json
-import pytest
 import logging
-from PolUVR.utils.cli import main
 import subprocess
 from unittest import mock
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import MagicMock, mock_open, patch
+
+import pytest
+
+from PolUVR.utils.cli import main
 
 
 # Common fixture for expected arguments
@@ -34,19 +36,19 @@ def common_expected_args():
 # Test the CLI with version argument using subprocess
 def test_cli_version_subprocess():
     # Run the CLI script with the '--version' argument
-    result = subprocess.run(["poetry", "run", "PolUVR", "--version"], capture_output=True, text=True)
+    result = subprocess.run(["poetry", "run", "PolUVR", "--version"], check=False, capture_output=True, text=True)
     assert result.returncode == 0
     assert "PolUVR" in result.stdout
 
     # Test with the short version flag '-v'
-    result = subprocess.run(["poetry", "run", "PolUVR", "-v"], capture_output=True, text=True)
+    result = subprocess.run(["poetry", "run", "PolUVR", "-v"], check=False, capture_output=True, text=True)
     assert result.returncode == 0
     assert "PolUVR" in result.stdout
 
 
 # Test the CLI with no arguments
 def test_cli_no_args(capsys):
-    result = subprocess.run(["poetry", "run", "PolUVR"], capture_output=True, text=True)
+    result = subprocess.run(["poetry", "run", "PolUVR"], check=False, capture_output=True, text=True)
     assert result.returncode == 1
     assert "usage:" in result.stdout
 
@@ -63,7 +65,7 @@ def test_cli_multiple_filenames():
 
     # Patch multiple functions to prevent actual file operations and separations
     with patch("sys.argv", test_args), patch("builtins.open", mock_file), patch("PolUVR.separator.Separator.separate") as mock_separate, patch(
-        "PolUVR.separator.Separator.load_model"
+        "PolUVR.separator.Separator.load_model",
     ), patch("logging.getLogger", return_value=mock_logger):
 
         # Mock the separate method to return some dummy output
@@ -269,7 +271,7 @@ def test_cli_demucs_output_names_argument(common_expected_args):
         "Bass": "bass_output",
         "Other": "other_output",
         "Guitar": "guitar_output",
-        "Piano": "piano_output"
+        "Piano": "piano_output",
     }
     test_args = ["cli.py", "test_audio.mp3", f"--custom_output_names={json.dumps(demucs_output_names)}", "--model_filename=htdemucs_6s.yaml"]
     with patch("sys.argv", test_args):

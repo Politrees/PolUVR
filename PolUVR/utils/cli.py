@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import argparse
-import logging
 import json
-import sys
+import logging
 import os
+import sys
 from importlib import metadata
 
 

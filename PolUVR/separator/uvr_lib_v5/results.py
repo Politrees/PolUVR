@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 
-"""
-Matchering - Audio Matching and Mastering Python Library
+"""Matchering - Audio Matching and Mastering Python Library
 Copyright (C) 2016-2022 Sergree
 
 This program is free software: you can redistribute it and/or modify
@@ -19,12 +17,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import os
+
 import soundfile as sf
 
 
 class Result:
     def __init__(
-        self, file: str, subtype: str, use_limiter: bool = True, normalize: bool = True
+        self, file: str, subtype: str, use_limiter: bool = True, normalize: bool = True,
     ):
         _, file_ext = os.path.splitext(file)
         file_ext = file_ext[1:].upper()

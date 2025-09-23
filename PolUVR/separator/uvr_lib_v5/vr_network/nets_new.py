@@ -1,12 +1,12 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
+
 from . import layers_new as layers
 
 
 class BaseNet(nn.Module):
-    """
-    BaseNet Class:
+    """BaseNet Class:
     This class defines the base network architecture for vocal removal. It includes a series of encoders for feature extraction,
     an ASPP module for capturing multi-scale context, and a series of decoders for reconstructing the output. Additionally,
     it incorporates an LSTM module for capturing temporal dependencies.
@@ -56,8 +56,7 @@ class BaseNet(nn.Module):
 
 
 class CascadedNet(nn.Module):
-    """
-    CascadedNet Class:
+    """CascadedNet Class:
     This class defines a cascaded network architecture that processes input in multiple stages, each stage focusing on different frequency bands.
     It utilizes the BaseNet for processing, and combines outputs from different stages to produce the final mask for vocal removal.
     """
@@ -133,8 +132,7 @@ class CascadedNet(nn.Module):
             aux = torch.sigmoid(self.aux_out(aux))
             aux = F.pad(input=aux, pad=(0, 0, 0, self.output_bin - aux.size()[2]), mode="replicate")
             return mask, aux
-        else:
-            return mask
+        return mask
 
     # Method for predicting the mask given an input tensor.
     def predict_mask(self, input_tensor):

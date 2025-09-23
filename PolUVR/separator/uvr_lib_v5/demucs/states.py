@@ -3,20 +3,18 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
+"""Utilities to save and load models.
 """
-Utilities to save and load models.
-"""
-from contextlib import contextmanager
-
 import functools
 import hashlib
 import inspect
 import io
-from pathlib import Path
 import warnings
+from contextlib import contextmanager
+from pathlib import Path
 
-from diffq import DiffQuantizer, UniformQuantizer, restore_quantized_state
 import torch
+from diffq import DiffQuantizer, UniformQuantizer, restore_quantized_state
 
 
 def get_quantizer(model, args, optimizer=None):
@@ -33,7 +31,8 @@ def get_quantizer(model, args, optimizer=None):
 
 def load_model(path_or_package, strict=False):
     """Load a model from the given serialized model, either given as a dict (already loaded)
-    or a path to a file on disk."""
+    or a path to a file on disk.
+    """
     if isinstance(path_or_package, dict):
         package = path_or_package
     elif isinstance(path_or_package, (str, Path)):
@@ -67,7 +66,8 @@ def load_model(path_or_package, strict=False):
 def get_state(model, quantizer, half=False):
     """Get the state from a model, potentially with quantization applied.
     If `half` is True, model are stored as half precision, which shouldn't impact performance
-    but half the state size."""
+    but half the state size.
+    """
     if quantizer is None:
         dtype = torch.half if half else None
         state = {k: p.data.to(device="cpu", dtype=dtype) for k, p in model.state_dict().items()}
@@ -91,7 +91,8 @@ def set_state(model, state, quantizer=None):
 
 def save_with_checksum(content, path):
     """Save the given value on disk, along with a sha256 hash.
-    Should be used with the output of either `serialize_model` or `get_state`."""
+    Should be used with the output of either `serialize_model` or `get_state`.
+    """
     buf = io.BytesIO()
     torch.save(content, buf)
     sig = hashlib.sha256(buf.getvalue()).hexdigest()[:8]
@@ -106,13 +107,12 @@ def copy_state(state):
 
 @contextmanager
 def swap_state(model, state):
-    """
-    Context manager that swaps the state of a model, e.g:
+    """Context manager that swaps the state of a model, e.g:
 
-        # model is in old state
-        with swap_state(model, new_state):
-            # model in new state
-        # model back to old state
+    # model is in old state
+    with swap_state(model, new_state):
+        # model in new state
+    # model back to old state
     """
     old_state = copy_state(model.state_dict())
     model.load_state_dict(state, strict=False)

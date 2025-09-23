@@ -8,8 +8,8 @@ import math
 
 import julius
 from torch import nn
-from .tasnet_v2 import ConvTasNet
 
+from .tasnet_v2 import ConvTasNet
 from .utils import capture_init, center_trim
 
 
@@ -79,35 +79,34 @@ class Demucs(nn.Module):
         samplerate=44100,
         segment_length=4 * 10 * 44100,
     ):
-        """
-        Args:
-            sources (list[str]): list of source names
-            audio_channels (int): stereo or mono
-            channels (int): first convolution channels
-            depth (int): number of encoder/decoder layers
-            rewrite (bool): add 1x1 convolution to each encoder layer
-                and a convolution to each decoder layer.
-                For the decoder layer, `context` gives the kernel size.
-            glu (bool): use glu instead of ReLU
-            resample_input (bool): upsample x2 the input and downsample /2 the output.
-            rescale (int): rescale initial weights of convolutions
-                to get their standard deviation closer to `rescale`
-            kernel_size (int): kernel size for convolutions
-            stride (int): stride for convolutions
-            growth (float): multiply (resp divide) number of channels by that
-                for each layer of the encoder (resp decoder)
-            lstm_layers (int): number of lstm layers, 0 = no lstm
-            context (int): kernel size of the convolution in the
-                decoder before the transposed convolution. If > 1,
-                will provide some context from neighboring time
-                steps.
-            samplerate (int): stored as meta information for easing
-                future evaluations of the model.
-            segment_length (int): stored as meta information for easing
-                future evaluations of the model. Length of the segments on which
-                the model was trained.
-        """
+        """Args:
+        sources (list[str]): list of source names
+        audio_channels (int): stereo or mono
+        channels (int): first convolution channels
+        depth (int): number of encoder/decoder layers
+        rewrite (bool): add 1x1 convolution to each encoder layer
+            and a convolution to each decoder layer.
+            For the decoder layer, `context` gives the kernel size.
+        glu (bool): use glu instead of ReLU
+        resample_input (bool): upsample x2 the input and downsample /2 the output.
+        rescale (int): rescale initial weights of convolutions
+            to get their standard deviation closer to `rescale`
+        kernel_size (int): kernel size for convolutions
+        stride (int): stride for convolutions
+        growth (float): multiply (resp divide) number of channels by that
+            for each layer of the encoder (resp decoder)
+        lstm_layers (int): number of lstm layers, 0 = no lstm
+        context (int): kernel size of the convolution in the
+            decoder before the transposed convolution. If > 1,
+            will provide some context from neighboring time
+            steps.
+        samplerate (int): stored as meta information for easing
+            future evaluations of the model.
+        segment_length (int): stored as meta information for easing
+            future evaluations of the model. Length of the segments on which
+            the model was trained.
 
+        """
         super().__init__()
         self.audio_channels = audio_channels
         self.sources = sources
@@ -163,8 +162,7 @@ class Demucs(nn.Module):
             rescale_module(self, reference=rescale)
 
     def valid_length(self, length):
-        """
-        Return the nearest valid length to use with the model so that
+        """Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolutions, e.g. for all
         layers, size of the input - kernel_size % stride = 0.
 

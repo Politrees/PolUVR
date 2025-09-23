@@ -1,13 +1,12 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 from PolUVR.separator.uvr_lib_v5 import spec_utils
 
 
 class Conv2DBNActiv(nn.Module):
-    """
-    Conv2DBNActiv Class:
+    """Conv2DBNActiv Class:
     This class implements a convolutional layer followed by batch normalization and an activation function.
     It is a fundamental building block for constructing neural networks, especially useful in image and audio processing tasks.
     The class encapsulates the pattern of applying a convolution, normalizing the output, and then applying a non-linear activation.
@@ -25,8 +24,7 @@ class Conv2DBNActiv(nn.Module):
 
 
 class Encoder(nn.Module):
-    """
-    Encoder Class:
+    """Encoder Class:
     This class defines an encoder module typically used in autoencoder architectures.
     It consists of two convolutional layers, each followed by batch normalization and an activation function.
     """
@@ -48,8 +46,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """
-    Decoder Class:
+    """Decoder Class:
     This class defines a decoder module, which is the counterpart of the Encoder class in autoencoder architectures.
     It applies a convolutional layer followed by batch normalization and an activation function, with an optional dropout layer for regularization.
     """
@@ -79,8 +76,7 @@ class Decoder(nn.Module):
 
 
 class ASPPModule(nn.Module):
-    """
-    ASPPModule Class:
+    """ASPPModule Class:
     This class implements the Atrous Spatial Pyramid Pooling (ASPP) module, which is useful for semantic image segmentation tasks.
     It captures multi-scale contextual information by applying convolutions at multiple dilation rates.
     """
@@ -116,8 +112,7 @@ class ASPPModule(nn.Module):
 
 
 class LSTMModule(nn.Module):
-    """
-    LSTMModule Class:
+    """LSTMModule Class:
     This class defines a module that combines convolutional feature extraction with a bidirectional LSTM for sequence modeling.
     It is useful for tasks that require understanding temporal dynamics in data, such as speech and audio processing.
     """

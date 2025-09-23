@@ -1,20 +1,21 @@
-""" This file contains the CommonSeparator class, common to all architecture-specific Separator classes. """
+"""This file contains the CommonSeparator class, common to all architecture-specific Separator classes."""
 
-from logging import Logger
-import os
 import gc
+import os
 import re
-import numpy as np
+from logging import Logger
+
 import librosa
+import numpy as np
+import soundfile as sf
 import torch
 from pydub import AudioSegment
-import soundfile as sf
+
 from PolUVR.separator.uvr_lib_v5 import spec_utils
 
 
 class CommonSeparator:
-    """
-    This class contains the common methods and attributes common to all architecture-specific Separator classes.
+    """This class contains the common methods and attributes common to all architecture-specific Separator classes.
     """
 
     ALL_STEMS = "All Stems"
@@ -137,14 +138,12 @@ class CommonSeparator:
         return secondary_stem
 
     def separate(self, audio_file_path):
-        """
-        Placeholder method for separating audio sources. Should be overridden by subclasses.
+        """Placeholder method for separating audio sources. Should be overridden by subclasses.
         """
         raise NotImplementedError("This method should be overridden by subclasses.")
 
     def final_process(self, stem_path, source, stem_name):
-        """
-        Finalizes the processing of a stem by writing the audio to a file and returning the processed source.
+        """Finalizes the processing of a stem by writing the audio to a file and returning the processed source.
         """
         self.logger.debug(f"Finalizing {stem_name} stem processing and writing audio...")
         self.write_audio(stem_path, source)
@@ -152,8 +151,7 @@ class CommonSeparator:
         return {stem_name: source}
 
     def cached_sources_clear(self):
-        """
-        Clears the cache dictionaries for VR, MDX, and Demucs models.
+        """Clears the cache dictionaries for VR, MDX, and Demucs models.
 
         This function is essential for ensuring that the cache does not hold outdated or irrelevant data
         between different processing sessions or when a new batch of audio files is processed.
@@ -162,8 +160,7 @@ class CommonSeparator:
         self.cached_sources_map = {}
 
     def cached_source_callback(self, model_architecture, model_name=None):
-        """
-        Retrieves the model and sources from the cache based on the processing method and model name.
+        """Retrieves the model and sources from the cache based on the processing method and model name.
 
         Args:
             model_architecture: The architecture type (VR, MDX, or Demucs) being used for processing.
@@ -175,6 +172,7 @@ class CommonSeparator:
         This function is crucial for optimizing performance by avoiding redundant processing.
         If the requested model and its sources are already in the cache, they can be reused directly,
         saving time and computational resources.
+
         """
         model, sources = None, None
 
@@ -188,15 +186,13 @@ class CommonSeparator:
         return model, sources
 
     def cached_model_source_holder(self, model_architecture, sources, model_name=None):
-        """
-        Update the dictionary for the given model_architecture with the new model name and its sources.
+        """Update the dictionary for the given model_architecture with the new model name and its sources.
         Use the model_architecture as a key to access the corresponding cache source mapper dictionary.
         """
-        self.cached_sources_map[model_architecture] = {**self.cached_sources_map.get(model_architecture, {}), **{model_name: sources}}
+        self.cached_sources_map[model_architecture] = {**self.cached_sources_map.get(model_architecture, {}), model_name: sources}
 
     def prepare_mix(self, mix):
-        """
-        Prepares the mix for processing. This includes loading the audio from a file if necessary,
+        """Prepares the mix for processing. This includes loading the audio from a file if necessary,
         ensuring the mix is in the correct format, and converting mono to stereo if needed.
         """
         # Store the original path or the mix itself for later checks
@@ -219,8 +215,7 @@ class CommonSeparator:
                 error_msg = f"Audio file {audio_path} is empty or not valid"
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
-            else:
-                self.logger.debug("Audio file is valid and contains data.")
+            self.logger.debug("Audio file is valid and contains data.")
 
         # Ensure the mix is in stereo format
         if mix.ndim == 1:
@@ -233,8 +228,7 @@ class CommonSeparator:
         return mix
 
     def write_audio(self, stem_path: str, stem_source):
-        """
-        Writes the separated audio source to a file using pydub or soundfile
+        """Writes the separated audio source to a file using pydub or soundfile
         Pydub supports a much wider range of audio formats and produces better encoded lossy files for some formats.
         Soundfile is used for very large files (longer than 1 hour), as pydub has memory issues with large files:
         https://github.com/jiaaro/pydub/issues/135
@@ -245,15 +239,14 @@ class CommonSeparator:
         self.logger.info(f"Audio duration is {duration_hours:.2f} hours ({duration_seconds:.2f} seconds).")
 
         if self.use_soundfile:
-            self.logger.warning(f"Using soundfile for writing.")
+            self.logger.warning("Using soundfile for writing.")
             self.write_audio_soundfile(stem_path, stem_source)
         else:
-            self.logger.info(f"Using pydub for writing.")
+            self.logger.info("Using pydub for writing.")
             self.write_audio_pydub(stem_path, stem_source)
 
     def write_audio_pydub(self, stem_path: str, stem_source):
-        """
-        Writes the separated audio source to a file using pydub (ffmpeg)
+        """Writes the separated audio source to a file using pydub (ffmpeg)
         """
         self.logger.debug(f"Entering write_audio_pydub with stem_path: {stem_path}")
 
@@ -288,7 +281,7 @@ class CommonSeparator:
         try:
             audio_segment = AudioSegment(stem_source_interleaved.tobytes(), frame_rate=self.sample_rate, sample_width=stem_source.dtype.itemsize, channels=2)
             self.logger.debug("Created AudioSegment successfully.")
-        except (IOError, ValueError) as e:
+        except (OSError, ValueError) as e:
             self.logger.error(f"Specific error creating AudioSegment: {e}")
             return
 
@@ -308,12 +301,11 @@ class CommonSeparator:
         try:
             audio_segment.export(stem_path, format=file_format, bitrate=bitrate)
             self.logger.debug(f"Exported audio file successfully to {stem_path}")
-        except (IOError, ValueError) as e:
+        except (OSError, ValueError) as e:
             self.logger.error(f"Error exporting audio file: {e}")
 
     def write_audio_soundfile(self, stem_path: str, stem_source):
-        """
-        Writes the separated audio source to a file using soundfile library.
+        """Writes the separated audio source to a file using soundfile library.
         """
         self.logger.debug(f"Entering write_audio_soundfile with stem_path: {stem_path}")
 
@@ -347,8 +339,7 @@ class CommonSeparator:
             self.logger.error(f"Error exporting audio file: {e}")
 
     def clear_gpu_cache(self):
-        """
-        This method clears the GPU cache to free up memory.
+        """This method clears the GPU cache to free up memory.
         """
         self.logger.debug("Running garbage collection...")
         gc.collect()
@@ -360,8 +351,7 @@ class CommonSeparator:
             torch.cuda.empty_cache()
 
     def clear_file_specific_paths(self):
-        """
-        Clears the file-specific variables which need to be cleared between processing different audio inputs.
+        """Clears the file-specific variables which need to be cleared between processing different audio inputs.
         """
         self.logger.info("Clearing input audio file paths, sources and stems...")
 
@@ -375,17 +365,15 @@ class CommonSeparator:
         self.secondary_stem_output_path = None
 
     def sanitize_filename(self, filename):
+        """Cleans the filename by replacing invalid characters with underscores.
         """
-        Cleans the filename by replacing invalid characters with underscores.
-        """
-        sanitized = re.sub(r'[<>:"/\\|?*]', '_', filename)
-        sanitized = re.sub(r'_+', '_', sanitized)
-        sanitized = sanitized.strip('_. ')
+        sanitized = re.sub(r'[<>:"/\\|?*]', "_", filename)
+        sanitized = re.sub(r"_+", "_", sanitized)
+        sanitized = sanitized.strip("_. ")
         return sanitized
 
     def get_stem_output_path(self, stem_name, custom_output_names):
-        """
-        Gets the output path for a stem based on the stem name and custom output names.
+        """Gets the output path for a stem based on the stem name and custom output names.
         """
         # Convert custom_output_names keys to lowercase for case-insensitive comparison
         if custom_output_names:
@@ -397,7 +385,7 @@ class CommonSeparator:
 
         sanitized_audio_base = self.sanitize_filename(self.audio_file_base)
         sanitized_stem_name = self.sanitize_filename(stem_name)
-        sanitized_model_name = self.sanitize_filename(self.model_name) 
+        sanitized_model_name = self.sanitize_filename(self.model_name)
 
         filename = f"{sanitized_audio_base}_({sanitized_stem_name})_{sanitized_model_name}.{self.output_format.lower()}"
         return os.path.join(filename)

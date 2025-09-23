@@ -3,24 +3,25 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
+"""This code contains the spectrogram and Hybrid version of Demucs.
 """
-This code contains the spectrogram and Hybrid version of Demucs.
-"""
-from copy import deepcopy
 import math
-import typing as tp
+from copy import deepcopy
+
 import torch
 from torch import nn
 from torch.nn import functional as F
-from .filtering import wiener
+
 from .demucs import DConv, rescale_module
+from .filtering import wiener
+from .spec import ispectro, spectro
 from .states import capture_init
-from .spec import spectro, ispectro
 
 
-def pad1d(x: torch.Tensor, paddings: tp.Tuple[int, int], mode: str = "constant", value: float = 0.0):
+def pad1d(x: torch.Tensor, paddings: tuple[int, int], mode: str = "constant", value: float = 0.0):
     """Tiny wrapper around F.pad, just to allow for reflect padding on small input.
-    If this is the case, we insert extra 0 padding to the right before the reflection happen."""
+    If this is the case, we insert extra 0 padding to the right before the reflection happen.
+    """
     x0 = x
     length = x.shape[-1]
     padding_left, padding_right = paddings
@@ -39,8 +40,7 @@ def pad1d(x: torch.Tensor, paddings: tp.Tuple[int, int], mode: str = "constant",
 
 
 class ScaledEmbedding(nn.Module):
-    """
-    Boost learning rate for embeddings (with `scale`).
+    """Boost learning rate for embeddings (with `scale`).
     Also, can make embeddings continuous with `smooth`.
     """
 
@@ -82,6 +82,7 @@ class HEncLayer(nn.Module):
             pad: pad the input. Padding is done so that the output size is
                 always the input size / stride.
             rewrite: add 1x1 conv at the end of the layer.
+
         """
         super().__init__()
         norm_fn = lambda d: nn.Identity()  # noqa
@@ -117,8 +118,7 @@ class HEncLayer(nn.Module):
             self.dconv = DConv(chout, **dconv_kw)
 
     def forward(self, x, inject=None):
-        """
-        `inject` is used to inject the result from the time branch into the frequency branch,
+        """`inject` is used to inject the result from the time branch into the frequency branch,
         when both have the same stride.
         """
         if not self.freq and x.dim() == 4:
@@ -154,8 +154,7 @@ class HEncLayer(nn.Module):
 
 
 class MultiWrap(nn.Module):
-    """
-    Takes one layer and replicate it N times. each replica will act
+    """Takes one layer and replicate it N times. each replica will act
     on a frequency band. All is done so that if the N replica have the same weights,
     then this is exactly equivalent to applying the original module on all frequencies.
 
@@ -164,10 +163,10 @@ class MultiWrap(nn.Module):
     """
 
     def __init__(self, layer, split_ratios):
-        """
-        Args:
-            layer: module to clone, must be either HEncLayer or HDecLayer.
-            split_ratios: list of float indicating which ratio to keep for each band.
+        """Args:
+        layer: module to clone, must be either HEncLayer or HDecLayer.
+        split_ratios: list of float indicating which ratio to keep for each band.
+
         """
         super().__init__()
         self.split_ratios = split_ratios
@@ -195,7 +194,7 @@ class MultiWrap(nn.Module):
         ratios = list(self.split_ratios) + [1]
         start = 0
         outs = []
-        for ratio, layer in zip(ratios, self.layers):
+        for ratio, layer in zip(ratios, self.layers, strict=False):
             if self.conv:
                 pad = layer.kernel_size // 4
                 if ratio == 1:
@@ -245,16 +244,14 @@ class MultiWrap(nn.Module):
             out = F.gelu(out)
         if self.conv:
             return out
-        else:
-            return out, None
+        return out, None
 
 
 class HDecLayer(nn.Module):
     def __init__(
-        self, chin, chout, last=False, kernel_size=8, stride=4, norm_groups=1, empty=False, freq=True, dconv=True, norm=True, context=1, dconv_kw={}, pad=True, context_freq=True, rewrite=True
+        self, chin, chout, last=False, kernel_size=8, stride=4, norm_groups=1, empty=False, freq=True, dconv=True, norm=True, context=1, dconv_kw={}, pad=True, context_freq=True, rewrite=True,
     ):
-        """
-        Same as HEncLayer but for decoder. See `HEncLayer` for documentation.
+        """Same as HEncLayer but for decoder. See `HEncLayer` for documentation.
         """
         super().__init__()
         norm_fn = lambda d: nn.Identity()  # noqa
@@ -331,8 +328,7 @@ class HDecLayer(nn.Module):
 
 
 class HDemucs(nn.Module):
-    """
-    Spectrogram and hybrid Demucs model.
+    """Spectrogram and hybrid Demucs model.
     The spectrogram model has the same structure as Demucs, except the first few layers are over the
     frequency axis, until there is only 1 frequency, and then it moves to time convolutions.
     Frequency layers can still access information across time steps thanks to the DConv residual.
@@ -406,47 +402,46 @@ class HDemucs(nn.Module):
         samplerate=44100,
         segment=4 * 10,
     ):
-        """
-        Args:
-            sources (list[str]): list of source names.
-            audio_channels (int): input/output audio channels.
-            channels (int): initial number of hidden channels.
-            channels_time: if not None, use a different `channels` value for the time branch.
-            growth: increase the number of hidden channels by this factor at each layer.
-            nfft: number of fft bins. Note that changing this require careful computation of
-                various shape parameters and will not work out of the box for hybrid models.
-            wiener_iters: when using Wiener filtering, number of iterations at test time.
-            end_iters: same but at train time. For a hybrid model, must be equal to `wiener_iters`.
-            wiener_residual: add residual source before wiener filtering.
-            cac: uses complex as channels, i.e. complex numbers are 2 channels each
-                in input and output. no further processing is done before ISTFT.
-            depth (int): number of layers in the encoder and in the decoder.
-            rewrite (bool): add 1x1 convolution to each layer.
-            hybrid (bool): make a hybrid time/frequency domain, otherwise frequency only.
-            hybrid_old: some models trained for MDX had a padding bug. This replicates
-                this bug to avoid retraining them.
-            multi_freqs: list of frequency ratios for splitting frequency bands with `MultiWrap`.
-            multi_freqs_depth: how many layers to wrap with `MultiWrap`. Only the outermost
-                layers will be wrapped.
-            freq_emb: add frequency embedding after the first frequency layer if > 0,
-                the actual value controls the weight of the embedding.
-            emb_scale: equivalent to scaling the embedding learning rate
-            emb_smooth: initialize the embedding with a smooth one (with respect to frequencies).
-            kernel_size: kernel_size for encoder and decoder layers.
-            stride: stride for encoder and decoder layers.
-            time_stride: stride for the final time layer, after the merge.
-            context: context for 1x1 conv in the decoder.
-            context_enc: context for 1x1 conv in the encoder.
-            norm_starts: layer at which group norm starts being used.
-                decoder layers are numbered in reverse order.
-            norm_groups: number of groups for group norm.
-            dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
-            dconv_depth: depth of residual DConv branch.
-            dconv_comp: compression of DConv branch.
-            dconv_attn: adds attention layers in DConv branch starting at this layer.
-            dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
-            dconv_init: initial scale for the DConv branch LayerScale.
-            rescale: weight recaling trick
+        """Args:
+        sources (list[str]): list of source names.
+        audio_channels (int): input/output audio channels.
+        channels (int): initial number of hidden channels.
+        channels_time: if not None, use a different `channels` value for the time branch.
+        growth: increase the number of hidden channels by this factor at each layer.
+        nfft: number of fft bins. Note that changing this require careful computation of
+            various shape parameters and will not work out of the box for hybrid models.
+        wiener_iters: when using Wiener filtering, number of iterations at test time.
+        end_iters: same but at train time. For a hybrid model, must be equal to `wiener_iters`.
+        wiener_residual: add residual source before wiener filtering.
+        cac: uses complex as channels, i.e. complex numbers are 2 channels each
+            in input and output. no further processing is done before ISTFT.
+        depth (int): number of layers in the encoder and in the decoder.
+        rewrite (bool): add 1x1 convolution to each layer.
+        hybrid (bool): make a hybrid time/frequency domain, otherwise frequency only.
+        hybrid_old: some models trained for MDX had a padding bug. This replicates
+            this bug to avoid retraining them.
+        multi_freqs: list of frequency ratios for splitting frequency bands with `MultiWrap`.
+        multi_freqs_depth: how many layers to wrap with `MultiWrap`. Only the outermost
+            layers will be wrapped.
+        freq_emb: add frequency embedding after the first frequency layer if > 0,
+            the actual value controls the weight of the embedding.
+        emb_scale: equivalent to scaling the embedding learning rate
+        emb_smooth: initialize the embedding with a smooth one (with respect to frequencies).
+        kernel_size: kernel_size for encoder and decoder layers.
+        stride: stride for encoder and decoder layers.
+        time_stride: stride for the final time layer, after the merge.
+        context: context for 1x1 conv in the decoder.
+        context_enc: context for 1x1 conv in the encoder.
+        norm_starts: layer at which group norm starts being used.
+            decoder layers are numbered in reverse order.
+        norm_groups: number of groups for group norm.
+        dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
+        dconv_depth: depth of residual DConv branch.
+        dconv_comp: compression of DConv branch.
+        dconv_attn: adds attention layers in DConv branch starting at this layer.
+        dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
+        dconv_init: initial scale for the DConv branch LayerScale.
+        rescale: weight recaling trick
 
         """
         super().__init__()
@@ -642,8 +637,7 @@ class HDemucs(nn.Module):
         if niters < 0:
             z = z[:, None]
             return z / (1e-8 + z.abs()) * m
-        else:
-            return self._wiener(m, z, niters)
+        return self._wiener(m, z, niters)
 
     def _wiener(self, mag_out, mix_stft, niters):
         # apply wiener filtering from OpenUnmix.
@@ -764,7 +758,7 @@ class HDemucs(nn.Module):
 
         device_type = x.device.type
         device_load = f"{device_type}:{x.device.index}" if not device_type == "mps" else device_type
-        x_is_other_gpu = not device_type in ["cuda", "cpu"]
+        x_is_other_gpu = device_type not in ["cuda", "cpu"]
 
         if x_is_other_gpu:
             x = x.cpu()
