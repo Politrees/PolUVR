@@ -1,13 +1,12 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 from PolUVR.separator.uvr_lib_v5 import spec_utils
 
 
 class Conv2DBNActiv(nn.Module):
-    """
-    This class implements a convolutional layer followed by batch normalization and an activation function.
+    """This class implements a convolutional layer followed by batch normalization and an activation function.
     It is a common pattern in deep learning for processing images or feature maps. The convolutional layer
     applies a set of learnable filters to the input. Batch normalization then normalizes the output of the
     convolution, and finally, an activation function introduces non-linearity to the model, allowing it to
@@ -24,6 +23,7 @@ class Conv2DBNActiv(nn.Module):
         padding_size (int, optional): Padding added to all sides of the input. Defaults to 1.
         dilation_rate (int, optional): Spacing between kernel elements. Defaults to 1.
         activation_function (callable, optional): The activation function to use. Defaults to nn.ReLU.
+
     """
 
     def __init__(self, nin, nout, ksize=3, stride=1, pad=1, dilation=1, activ=nn.ReLU):
@@ -40,8 +40,7 @@ class Conv2DBNActiv(nn.Module):
 
 
 class SeperableConv2DBNActiv(nn.Module):
-    """
-    This class implements a separable convolutional layer followed by batch normalization and an activation function.
+    """This class implements a separable convolutional layer followed by batch normalization and an activation function.
     Separable convolutions are a type of convolution that splits the convolution operation into two simpler operations:
     a depthwise convolution and a pointwise convolution. This can reduce the number of parameters and computational cost,
     making the network more efficient while maintaining similar performance.
@@ -50,6 +49,7 @@ class SeperableConv2DBNActiv(nn.Module):
     which follows, applies a 1x1 convolution to combine the outputs of the depthwise convolution across channels.
     Batch normalization is then applied to stabilize learning and reduce internal covariate shift. Finally,
     an activation function introduces non-linearity, allowing the network to learn complex patterns.
+
     Attributes:
         conv (nn.Sequential): A sequential container of depthwise Conv2d, pointwise Conv2d, BatchNorm2d, and an activation layer.
 
@@ -61,6 +61,7 @@ class SeperableConv2DBNActiv(nn.Module):
         padding_size (int, optional): Padding added to all sides of the input for the depthwise convolution. Defaults to 1.
         dilation_rate (int, optional): Spacing between kernel elements for the depthwise convolution. Defaults to 1.
         activation_function (callable, optional): The activation function to use. Defaults to nn.ReLU.
+
     """
 
     def __init__(self, nin, nout, ksize=3, stride=1, pad=1, dilation=1, activ=nn.ReLU):
@@ -100,12 +101,12 @@ class SeperableConv2DBNActiv(nn.Module):
 
 
 class Encoder(nn.Module):
-    """
-    The Encoder class is a part of the neural network architecture that is responsible for processing the input data.
+    """The Encoder class is a part of the neural network architecture that is responsible for processing the input data.
     It consists of two convolutional layers, each followed by batch normalization and an activation function.
     The purpose of the Encoder is to transform the input data into a higher-level, abstract representation.
     This is achieved by applying filters (through convolutions) that can capture patterns or features in the data.
     The Encoder can be thought of as a feature extractor that prepares the data for further processing by the network.
+
     Attributes:
         conv1 (Conv2DBNActiv): The first convolutional layer in the encoder.
         conv2 (Conv2DBNActiv): The second convolutional layer in the encoder.
@@ -117,6 +118,7 @@ class Encoder(nn.Module):
         stride_length (int): Stride for the convolutional operations.
         padding_size (int): Padding added to all sides of the input for the convolutional layers.
         activation_function (callable): The activation function to use after each convolutional layer.
+
     """
 
     def __init__(self, nin, nout, ksize=3, stride=1, pad=1, activ=nn.LeakyReLU):
@@ -146,8 +148,7 @@ class Encoder(nn.Module):
 
 
 class Decoder(nn.Module):
-    """
-    The Decoder class is part of the neural network architecture, specifically designed to perform the inverse operation of an encoder.
+    """The Decoder class is part of the neural network architecture, specifically designed to perform the inverse operation of an encoder.
     Its main role is to reconstruct or generate data from encoded representations, which is crucial in tasks like image segmentation or audio processing.
     This class uses upsampling, convolution, optional dropout for regularization, and concatenation of skip connections to achieve its goal.
 
@@ -163,6 +164,7 @@ class Decoder(nn.Module):
         padding (int): Padding added to all sides of the input for the convolutional layer.
         activation_function (callable): The activation function to use after the convolutional layer.
         include_dropout (bool): Whether to include a dropout layer for regularization.
+
     """
 
     def __init__(self, nin, nout, ksize=3, stride=1, pad=1, activ=nn.ReLU, dropout=False):
@@ -194,8 +196,7 @@ class Decoder(nn.Module):
 
 
 class ASPPModule(nn.Module):
-    """
-    Atrous Spatial Pyramid Pooling (ASPP) Module is designed for capturing multi-scale context by applying
+    """Atrous Spatial Pyramid Pooling (ASPP) Module is designed for capturing multi-scale context by applying
     atrous convolution at multiple rates. This is particularly useful in segmentation tasks where capturing
     objects at various scales is beneficial. The module applies several parallel dilated convolutions with
     different dilation rates to the input feature map, allowing it to efficiently capture information at
@@ -208,11 +209,11 @@ class ASPPModule(nn.Module):
         seven_layer (list): List containing architecture identifiers that require seven layers.
         conv2-conv7 (nn.Module): Convolutional layers with varying dilation rates for multi-scale feature extraction.
         bottleneck (nn.Sequential): A 1x1 convolutional layer that combines all features followed by dropout for regularization.
+
     """
 
     def __init__(self, nn_architecture, nin, nout, dilations=(4, 8, 16), activ=nn.ReLU):
-        """
-        Initializes the ASPP module with specified parameters.
+        """Initializes the ASPP module with specified parameters.
 
         Args:
             nn_architecture (int): Identifier for the neural network architecture.
@@ -220,6 +221,7 @@ class ASPPModule(nn.Module):
             output_channels (int): Number of output channels.
             dilations (tuple): Tuple of dilation rates for the atrous convolutions.
             activation (callable): Activation function to use after convolutional layers.
+
         """
         super(ASPPModule, self).__init__()
 
@@ -258,14 +260,14 @@ class ASPPModule(nn.Module):
         self.bottleneck = nn.Sequential(Conv2DBNActiv(nin * nin_x, nout, 1, 1, 0, activ=activ), nn.Dropout2d(0.1))
 
     def forward(self, input_tensor):
-        """
-        Forward pass of the ASPP module.
+        """Forward pass of the ASPP module.
 
         Args:
             input_tensor (Tensor): Input tensor.
 
         Returns:
             Tensor: Output tensor after applying ASPP.
+
         """
         _, _, h, w = input_tensor.size()
 

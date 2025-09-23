@@ -1,13 +1,12 @@
 import torch
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
 from . import layers
 
 
 class BaseASPPNet(nn.Module):
-    """
-    BaseASPPNet Class:
+    """BaseASPPNet Class:
     This class defines the base architecture for an Atrous Spatial Pyramid Pooling (ASPP) network.
     It is designed to extract features from input data at multiple scales by using dilated convolutions.
     This is particularly useful for tasks that benefit from understanding context at different resolutions,
@@ -65,12 +64,10 @@ class BaseASPPNet(nn.Module):
 
 
 def determine_model_capacity(n_fft_bins, nn_architecture):
-    """
-    The determine_model_capacity function is designed to select the appropriate model configuration
+    """The determine_model_capacity function is designed to select the appropriate model configuration
     based on the frequency bins and network architecture. It maps specific architectures to predefined
     model capacities, which dictate the structure and parameters of the CascadedASPPNet model.
     """
-
     # Predefined model architectures categorized by their precision level.
     sp_model_arch = [31191, 33966, 129605]
     hp_model_arch = [123821, 123812]
@@ -94,8 +91,7 @@ def determine_model_capacity(n_fft_bins, nn_architecture):
 
 
 class CascadedASPPNet(nn.Module):
-    """
-    CascadedASPPNet Class:
+    """CascadedASPPNet Class:
     This class implements a cascaded version of the ASPP network, designed for processing audio signals
     for tasks such as vocal removal. It consists of multiple stages, each with its own ASPP network,
     to process different frequency bands of the input signal. This allows the model to effectively
@@ -160,8 +156,7 @@ class CascadedASPPNet(nn.Module):
             aux2 = torch.sigmoid(self.aux2_out(aux2))
             aux2 = F.pad(input=aux2, pad=(0, 0, 0, self.output_bin - aux2.size()[2]), mode="replicate")
             return mask * mix, aux1 * mix, aux2 * mix
-        else:
-            return mask  # * mix
+        return mask  # * mix
 
     def predict_mask(self, input_tensor):
         # This method predicts the mask for the input tensor by calling the forward method

@@ -1,20 +1,16 @@
 from functools import partial
 
 import torch
-from torch import nn, einsum, Tensor
-from torch.nn import Module, ModuleList
 import torch.nn.functional as F
+from beartype import beartype
+from beartype.typing import Callable, Optional, Tuple
+from einops import pack, rearrange, reduce, repeat, unpack
+from librosa import filters
+from rotary_embedding_torch import RotaryEmbedding
+from torch import nn
+from torch.nn import Module, ModuleList
 
 from .attend import Attend
-
-from beartype.typing import Tuple, Optional, List, Callable
-from beartype import beartype
-
-from rotary_embedding_torch import RotaryEmbedding
-
-from einops import rearrange, pack, unpack, reduce, repeat
-
-from librosa import filters
 
 
 def exists(val):
@@ -104,8 +100,8 @@ class Transformer(Module):
         for _ in range(depth):
             self.layers.append(
                 ModuleList(
-                    [Attention(dim=dim, dim_head=dim_head, heads=heads, dropout=attn_dropout, rotary_embed=rotary_embed, flash=flash_attn), FeedForward(dim=dim, mult=ff_mult, dropout=ff_dropout)]
-                )
+                    [Attention(dim=dim, dim_head=dim_head, heads=heads, dropout=attn_dropout, rotary_embed=rotary_embed, flash=flash_attn), FeedForward(dim=dim, mult=ff_mult, dropout=ff_dropout)],
+                ),
             )
 
         self.norm = RMSNorm(dim) if norm_output else nn.Identity()
@@ -135,7 +131,7 @@ class BandSplit(Module):
         x = x.split(self.dim_inputs, dim=-1)
 
         outs = []
-        for split_input, to_feature in zip(x, self.to_features):
+        for split_input, to_feature in zip(x, self.to_features, strict=False):
             split_output = to_feature(split_input)
             outs.append(split_output)
 
@@ -148,7 +144,7 @@ def MLP(dim_in, dim_out, dim_hidden=None, depth=1, activation=nn.Tanh):
     net = []
     dims = (dim_in, *((dim_hidden,) * depth), dim_out)
 
-    for ind, (layer_dim_in, layer_dim_out) in enumerate(zip(dims[:-1], dims[1:])):
+    for ind, (layer_dim_in, layer_dim_out) in enumerate(zip(dims[:-1], dims[1:], strict=False)):
         is_last = ind == (len(dims) - 2)
 
         net.append(nn.Linear(layer_dim_in, layer_dim_out))
@@ -181,7 +177,7 @@ class MaskEstimator(Module):
 
         outs = []
 
-        for band_features, mlp in zip(x, self.to_freqs):
+        for band_features, mlp in zip(x, self.to_freqs, strict=False):
             freq_out = mlp(band_features)
             outs.append(freq_out)
 
@@ -240,8 +236,8 @@ class MelBandRoformer(Module):
                     [
                         Transformer(depth=time_transformer_depth, rotary_embed=time_rotary_embed, **transformer_kwargs),
                         Transformer(depth=freq_transformer_depth, rotary_embed=freq_rotary_embed, **transformer_kwargs),
-                    ]
-                )
+                    ],
+                ),
             )
 
         self.stft_window_fn = partial(default(stft_window_fn, torch.hann_window), stft_win_length)
@@ -299,8 +295,7 @@ class MelBandRoformer(Module):
         self.match_input_audio_length = match_input_audio_length
 
     def forward(self, raw_audio, target=None, return_loss_breakdown=False):
-        """
-        einops
+        """Einops
 
         b - batch
         f - freq
@@ -310,7 +305,6 @@ class MelBandRoformer(Module):
         c - complex (2)
         d - feature dimension
         """
-
         original_device = raw_audio.device
         x_is_mps = True if original_device.type == "mps" else False
 
@@ -422,7 +416,7 @@ class MelBandRoformer(Module):
 
         for window_size in self.multi_stft_resolutions_window_sizes:
             res_stft_kwargs = dict(
-                n_fft=max(window_size, self.multi_stft_n_fft), win_length=window_size, return_complex=True, window=self.multi_stft_window_fn(window_size, device=device), **self.multi_stft_kwargs
+                n_fft=max(window_size, self.multi_stft_n_fft), win_length=window_size, return_complex=True, window=self.multi_stft_window_fn(window_size, device=device), **self.multi_stft_kwargs,
             )
 
             recon_Y = torch.stft(rearrange(recon_audio, "... s t -> (... s) t"), **res_stft_kwargs)

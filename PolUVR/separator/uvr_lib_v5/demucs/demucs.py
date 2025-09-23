@@ -17,8 +17,7 @@ from .utils import center_trim, unfold
 
 
 class BLSTM(nn.Module):
-    """
-    BiLSTM with same hidden units as input dim.
+    """BiLSTM with same hidden units as input dim.
     If `max_steps` is not None, input will be splitting in overlapping
     chunks and the LSTM applied separately on each chunk.
     """
@@ -35,7 +34,7 @@ class BLSTM(nn.Module):
         B, C, T = x.shape
         y = x
         framed = False
-        if self.max_steps is not None and T > self.max_steps:
+        if self.max_steps is not None and self.max_steps < T:
             width = self.max_steps
             stride = width // 2
             frames = unfold(x, width, stride)
@@ -97,31 +96,29 @@ class LayerScale(nn.Module):
 
 
 class DConv(nn.Module):
-    """
-    New residual branches in each encoder layer.
+    """New residual branches in each encoder layer.
     This alternates dilated convolutions, potentially with LSTMs and attention.
     Also before entering each residual branch, dimension is projected on a smaller subspace,
     e.g. of dim `channels // compress`.
     """
 
     def __init__(self, channels: int, compress: float = 4, depth: int = 2, init: float = 1e-4, norm=True, attn=False, heads=4, ndecay=4, lstm=False, gelu=True, kernel=3, dilate=True):
-        """
-        Args:
-            channels: input/output channels for residual branch.
-            compress: amount of channel compression inside the branch.
-            depth: number of layers in the residual branch. Each layer has its own
-                projection, and potentially LSTM and attention.
-            init: initial scale for LayerNorm.
-            norm: use GroupNorm.
-            attn: use LocalAttention.
-            heads: number of heads for the LocalAttention.
-            ndecay: number of decay controls in the LocalAttention.
-            lstm: use LSTM.
-            gelu: Use GELU activation.
-            kernel: kernel size for the (dilated) convolutions.
-            dilate: if true, use dilation, increasing with the depth.
-        """
+        """Args:
+        channels: input/output channels for residual branch.
+        compress: amount of channel compression inside the branch.
+        depth: number of layers in the residual branch. Each layer has its own
+            projection, and potentially LSTM and attention.
+        init: initial scale for LayerNorm.
+        norm: use GroupNorm.
+        attn: use LocalAttention.
+        heads: number of heads for the LocalAttention.
+        ndecay: number of decay controls in the LocalAttention.
+        lstm: use LSTM.
+        gelu: Use GELU activation.
+        kernel: kernel size for the (dilated) convolutions.
+        dilate: if true, use dilation, increasing with the depth.
 
+        """
         super().__init__()
         assert kernel % 2 == 1
         self.channels = channels
@@ -136,7 +133,7 @@ class DConv(nn.Module):
 
         hidden = int(channels / compress)
 
-        act: tp.Type[nn.Module]
+        act: type[nn.Module]
         if gelu:
             act = nn.GELU
         else:
@@ -270,46 +267,45 @@ class Demucs(nn.Module):
         samplerate=44100,
         segment=4 * 10,
     ):
-        """
-        Args:
-            sources (list[str]): list of source names
-            audio_channels (int): stereo or mono
-            channels (int): first convolution channels
-            depth (int): number of encoder/decoder layers
-            growth (float): multiply (resp divide) number of channels by that
-                for each layer of the encoder (resp decoder)
-            depth (int): number of layers in the encoder and in the decoder.
-            rewrite (bool): add 1x1 convolution to each layer.
-            lstm_layers (int): number of lstm layers, 0 = no lstm. Deactivated
-                by default, as this is now replaced by the smaller and faster small LSTMs
-                in the DConv branches.
-            kernel_size (int): kernel size for convolutions
-            stride (int): stride for convolutions
-            context (int): kernel size of the convolution in the
-                decoder before the transposed convolution. If > 1,
-                will provide some context from neighboring time steps.
-            gelu: use GELU activation function.
-            glu (bool): use glu instead of ReLU for the 1x1 rewrite conv.
-            norm_starts: layer at which group norm starts being used.
-                decoder layers are numbered in reverse order.
-            norm_groups: number of groups for group norm.
-            dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
-            dconv_depth: depth of residual DConv branch.
-            dconv_comp: compression of DConv branch.
-            dconv_attn: adds attention layers in DConv branch starting at this layer.
-            dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
-            dconv_init: initial scale for the DConv branch LayerScale.
-            normalize (bool): normalizes the input audio on the fly, and scales back
-                the output by the same amount.
-            resample (bool): upsample x2 the input and downsample /2 the output.
-            rescale (int): rescale initial weights of convolutions
-                to get their standard deviation closer to `rescale`.
-            samplerate (int): stored as meta information for easing
-                future evaluations of the model.
-            segment (float): duration of the chunks of audio to ideally evaluate the model on.
-                This is used by `demucs.apply.apply_model`.
-        """
+        """Args:
+        sources (list[str]): list of source names
+        audio_channels (int): stereo or mono
+        channels (int): first convolution channels
+        depth (int): number of encoder/decoder layers
+        growth (float): multiply (resp divide) number of channels by that
+            for each layer of the encoder (resp decoder)
+        depth (int): number of layers in the encoder and in the decoder.
+        rewrite (bool): add 1x1 convolution to each layer.
+        lstm_layers (int): number of lstm layers, 0 = no lstm. Deactivated
+            by default, as this is now replaced by the smaller and faster small LSTMs
+            in the DConv branches.
+        kernel_size (int): kernel size for convolutions
+        stride (int): stride for convolutions
+        context (int): kernel size of the convolution in the
+            decoder before the transposed convolution. If > 1,
+            will provide some context from neighboring time steps.
+        gelu: use GELU activation function.
+        glu (bool): use glu instead of ReLU for the 1x1 rewrite conv.
+        norm_starts: layer at which group norm starts being used.
+            decoder layers are numbered in reverse order.
+        norm_groups: number of groups for group norm.
+        dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
+        dconv_depth: depth of residual DConv branch.
+        dconv_comp: compression of DConv branch.
+        dconv_attn: adds attention layers in DConv branch starting at this layer.
+        dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
+        dconv_init: initial scale for the DConv branch LayerScale.
+        normalize (bool): normalizes the input audio on the fly, and scales back
+            the output by the same amount.
+        resample (bool): upsample x2 the input and downsample /2 the output.
+        rescale (int): rescale initial weights of convolutions
+            to get their standard deviation closer to `rescale`.
+        samplerate (int): stored as meta information for easing
+            future evaluations of the model.
+        segment (float): duration of the chunks of audio to ideally evaluate the model on.
+            This is used by `demucs.apply.apply_model`.
 
+        """
         super().__init__()
         self.audio_channels = audio_channels
         self.sources = sources
@@ -380,8 +376,7 @@ class Demucs(nn.Module):
             rescale_module(self, reference=rescale)
 
     def valid_length(self, length):
-        """
-        Return the nearest valid length to use with the model so that
+        """Return the nearest valid length to use with the model so that
         there is no time steps left over in a convolution, e.g. for all
         layers, size of the input - kernel_size % stride = 0.
 

@@ -1,7 +1,8 @@
 import torch
-import torch.nn as nn
-from .modules import TFC_TDF
 from pytorch_lightning import LightningModule
+from torch import nn
+
+from .modules import TFC_TDF
 
 dim_s = 4
 
@@ -21,10 +22,10 @@ class AbstractMDXNet(LightningModule):
         self.freq_pad = nn.Parameter(torch.zeros([1, dim_c, self.n_bins - self.dim_f, self.dim_t]), requires_grad=False)
 
     def get_optimizer(self):
-        if self.optimizer == 'rmsprop':
+        if self.optimizer == "rmsprop":
             return torch.optim.RMSprop(self.parameters(), self.lr)
-        
-        if self.optimizer == 'adamw':
+
+        if self.optimizer == "adamw":
             return torch.optim.AdamW(self.parameters(), self.lr)
 
 class ConvTDFNet(AbstractMDXNet):
@@ -42,12 +43,12 @@ class ConvTDFNet(AbstractMDXNet):
         self.bn = bn
         self.bias = bias
 
-        if optimizer == 'rmsprop':
+        if optimizer == "rmsprop":
             norm = nn.BatchNorm2d
-            
-        if optimizer == 'adamw':
+
+        if optimizer == "adamw":
             norm = lambda input:nn.GroupNorm(2, input)
-            
+
         self.n = num_blocks // 2
         scale = (2, 2)
 
@@ -67,8 +68,8 @@ class ConvTDFNet(AbstractMDXNet):
                 nn.Sequential(
                     nn.Conv2d(in_channels=c, out_channels=c + g, kernel_size=scale, stride=scale),
                     norm(c + g),
-                    nn.ReLU()
-                )
+                    nn.ReLU(),
+                ),
             )
             f = f // 2
             c += g
@@ -82,8 +83,8 @@ class ConvTDFNet(AbstractMDXNet):
                 nn.Sequential(
                     nn.ConvTranspose2d(in_channels=c, out_channels=c - g, kernel_size=scale, stride=scale),
                     norm(c - g),
-                    nn.ReLU()
-                )
+                    nn.ReLU(),
+                ),
             )
             f = f * 2
             c -= g
@@ -118,16 +119,16 @@ class ConvTDFNet(AbstractMDXNet):
         x = self.final_conv(x)
 
         return x
-    
+
 class Mixer(nn.Module):
     def __init__(self, device, mixer_path):
-        
+
         super(Mixer, self).__init__()
-        
+
         self.linear = nn.Linear((dim_s+1)*2, dim_s*2, bias=False)
-        
+
         self.load_state_dict(
-            torch.load(mixer_path, map_location=device)
+            torch.load(mixer_path, map_location=device),
         )
 
     def forward(self, x):

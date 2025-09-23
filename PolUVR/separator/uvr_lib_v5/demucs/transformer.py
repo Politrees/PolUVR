@@ -5,15 +5,15 @@
 # LICENSE file in the root directory of this source tree.
 # First author is Simon Rouard.
 
+import math
 import random
 import typing as tp
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import math
+import torch
+import torch.nn.functional as F
 from einops import rearrange
+from torch import nn
 
 
 def create_sin_embedding(length: int, dim: int, shift: int = 0, device="cpu", max_period=10000):
@@ -27,14 +27,13 @@ def create_sin_embedding(length: int, dim: int, shift: int = 0, device="cpu", ma
 
 
 def create_2d_sin_embedding(d_model, height, width, device="cpu", max_period=10000):
-    """
-    :param d_model: dimension of the model
+    """:param d_model: dimension of the model
     :param height: height of the positions
     :param width: width of the positions
     :return: d_model*height*width position matrix
     """
     if d_model % 4 != 0:
-        raise ValueError("Cannot use sin/cos positional encoding with " "odd dimension (got dim={:d})".format(d_model))
+        raise ValueError(f"Cannot use sin/cos positional encoding with odd dimension (got dim={d_model:d})")
     pe = torch.zeros(d_model, height, width)
     # Each dimension use half of d_model
     d_model = int(d_model / 2)
@@ -88,8 +87,7 @@ def get_causal_mask(length):
 
 
 def get_elementary_mask(T1, T2, mask_type, sparse_attn_window, global_window, mask_random_seed, sparsity, device):
-    """
-    When the input of the Decoder has length T1 and the output T2
+    """When the input of the Decoder has length T1 and the output T2
     The mask matrix has shape (T2, T1)
     """
     assert mask_type in ["diag", "jmask", "random", "global"]
@@ -127,8 +125,7 @@ def get_elementary_mask(T1, T2, mask_type, sparse_attn_window, global_window, ma
 
 
 def get_mask(T1, T2, mask_type, sparse_attn_window, global_window, mask_random_seed, sparsity, device):
-    """
-    Return a SparseCSRTensor mask that is a combination of elementary masks
+    """Return a SparseCSRTensor mask that is a combination of elementary masks
     mask_type can be a combination of multiple masks: for instance "diag_jmask_random"
     """
     from xformers.sparse import SparseCSRTensor
@@ -164,8 +161,7 @@ class LayerScale(nn.Module):
     """
 
     def __init__(self, channels: int, init: float = 0, channel_last=False):
-        """
-        channel_last = False corresponds to (B, C, T) tensors
+        """channel_last = False corresponds to (B, C, T) tensors
         channel_last = True corresponds to (T, B, C) tensors
         """
         super().__init__()
@@ -176,8 +172,7 @@ class LayerScale(nn.Module):
     def forward(self, x):
         if self.channel_last:
             return self.scale * x
-        else:
-            return self.scale[:, None] * x
+        return self.scale[:, None] * x
 
 
 class MyGroupNorm(nn.GroupNorm):
@@ -185,8 +180,7 @@ class MyGroupNorm(nn.GroupNorm):
         super().__init__(*args, **kwargs)
 
     def forward(self, x):
-        """
-        x: (B, T, C)
+        """x: (B, T, C)
         if num_groups=1: Normalisation on all T and C together for each B
         """
         x = x.transpose(1, 2)
@@ -255,8 +249,7 @@ class MyTransformerEncoderLayer(nn.TransformerEncoderLayer):
             self.mask_random_seed = mask_random_seed
 
     def forward(self, src, src_mask=None, src_key_padding_mask=None):
-        """
-        if batch_first = False, src shape is (T, B, C)
+        """If batch_first = False, src shape is (T, B, C)
         the case where batch_first=True is not covered
         """
         device = src.device
@@ -362,11 +355,10 @@ class CrossTransformerEncoderLayer(nn.Module):
                 self.mask_random_seed = mask_random_seed
 
     def forward(self, q, k, mask=None):
-        """
-        Args:
-            q: tensor of shape (T, B, C)
-            k: tensor of shape (S, B, C)
-            mask: tensor of shape (T, S)
+        """Args:
+        q: tensor of shape (T, B, C)
+        k: tensor of shape (S, B, C)
+        mask: tensor of shape (T, S)
 
         """
         device = q.device
@@ -403,10 +395,10 @@ class CrossTransformerEncoderLayer(nn.Module):
     def _get_activation_fn(self, activation):
         if activation == "relu":
             return F.relu
-        elif activation == "gelu":
+        if activation == "gelu":
             return F.gelu
 
-        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
+        raise RuntimeError(f"activation should be relu/gelu, not {activation}")
 
 
 # ----------------- MULTI-BLOCKS MODELS: -----------------------
@@ -430,7 +422,7 @@ class CrossTransformerEncoder(nn.Module):
         norm_out: bool = False,
         max_period: float = 10000.0,
         weight_decay: float = 0.0,
-        lr: tp.Optional[float] = None,
+        lr: float | None = None,
         layer_scale: bool = False,
         gelu: bool = True,
         sin_random_shift: int = 0,

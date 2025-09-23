@@ -1,12 +1,10 @@
-from functools import wraps
-from packaging import version
 from collections import namedtuple
+from functools import wraps
 
 import torch
-from torch import nn, einsum
 import torch.nn.functional as F
-
-from einops import rearrange, reduce
+from packaging import version
+from torch import einsum, nn
 
 # constants
 
@@ -26,7 +24,7 @@ def once(fn):
     def inner(x):
         nonlocal called
         if called:
-            return
+            return None
         called = True
         return fn(x)
 
@@ -81,14 +79,12 @@ class Attend(nn.Module):
         return out
 
     def forward(self, q, k, v):
-        """
-        einstein notation
+        """Einstein notation
         b - batch
         h - heads
         n, i, j - sequence length (base sequence length, source, target)
         d - feature dimension
         """
-
         q_len, k_len, device = q.shape[-2], k.shape[-2], q.device
 
         scale = q.shape[-1] ** -0.5
@@ -98,7 +94,7 @@ class Attend(nn.Module):
 
         # similarity
 
-        sim = einsum(f"b h i d, b h j d -> b h i j", q, k) * scale
+        sim = einsum("b h i d, b h j d -> b h i j", q, k) * scale
 
         # attention
 
@@ -107,6 +103,6 @@ class Attend(nn.Module):
 
         # aggregate values
 
-        out = einsum(f"b h i j, b h j d -> b h i d", attn, v)
+        out = einsum("b h i j, b h j d -> b h i d", attn, v)
 
         return out

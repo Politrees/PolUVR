@@ -1,6 +1,8 @@
-import torch
-import torch.nn as nn
 from functools import partial
+
+import torch
+from torch import nn
+
 
 class STFT:
     def __init__(self, n_fft, hop_length, dim_f, device):
@@ -11,8 +13,8 @@ class STFT:
         self.device = device
 
     def __call__(self, x):
-        
-        x_is_mps = not x.device.type in ["cuda", "cpu"]
+
+        x_is_mps = x.device.type not in ["cuda", "cpu"]
         if x_is_mps:
             x = x.cpu()
 
@@ -30,8 +32,8 @@ class STFT:
         return x[..., :self.dim_f, :]
 
     def inverse(self, x):
-        
-        x_is_mps = not x.device.type in ["cuda", "cpu"]
+
+        x_is_mps = x.device.type not in ["cuda", "cpu"]
         if x_is_mps:
             x = x.cpu()
 
@@ -54,29 +56,27 @@ class STFT:
 
 def get_norm(norm_type):
     def norm(c, norm_type):
-        if norm_type == 'BatchNorm':
+        if norm_type == "BatchNorm":
             return nn.BatchNorm2d(c)
-        elif norm_type == 'InstanceNorm':
+        if norm_type == "InstanceNorm":
             return nn.InstanceNorm2d(c, affine=True)
-        elif 'GroupNorm' in norm_type:
-            g = int(norm_type.replace('GroupNorm', ''))
+        if "GroupNorm" in norm_type:
+            g = int(norm_type.replace("GroupNorm", ""))
             return nn.GroupNorm(num_groups=g, num_channels=c)
-        else:
-            return nn.Identity()
+        return nn.Identity()
 
     return partial(norm, norm_type=norm_type)
 
 
 def get_act(act_type):
-    if act_type == 'gelu':
+    if act_type == "gelu":
         return nn.GELU()
-    elif act_type == 'relu':
+    if act_type == "relu":
         return nn.ReLU()
-    elif act_type[:3] == 'elu':
-        alpha = float(act_type.replace('elu', ''))
+    if act_type[:3] == "elu":
+        alpha = float(act_type.replace("elu", ""))
         return nn.ELU(alpha)
-    else:
-        raise Exception
+    raise Exception
 
 
 class Upscale(nn.Module):
@@ -85,7 +85,7 @@ class Upscale(nn.Module):
         self.conv = nn.Sequential(
             norm(in_c),
             act,
-            nn.ConvTranspose2d(in_channels=in_c, out_channels=out_c, kernel_size=scale, stride=scale, bias=False)
+            nn.ConvTranspose2d(in_channels=in_c, out_channels=out_c, kernel_size=scale, stride=scale, bias=False),
         )
 
     def forward(self, x):
@@ -98,7 +98,7 @@ class Downscale(nn.Module):
         self.conv = nn.Sequential(
             norm(in_c),
             act,
-            nn.Conv2d(in_channels=in_c, out_channels=out_c, kernel_size=scale, stride=scale, bias=False)
+            nn.Conv2d(in_channels=in_c, out_channels=out_c, kernel_size=scale, stride=scale, bias=False),
         )
 
     def forward(self, x):
@@ -192,7 +192,7 @@ class TFC_TDF_net(nn.Module):
         self.final_conv = nn.Sequential(
             nn.Conv2d(c + dim_c, c, 1, 1, 0, bias=False),
             act,
-            nn.Conv2d(c, self.num_target_instruments * dim_c, 1, 1, 0, bias=False)
+            nn.Conv2d(c, self.num_target_instruments * dim_c, 1, 1, 0, bias=False),
         )
 
         self.stft = STFT(config.audio.n_fft, config.audio.hop_length, config.audio.dim_f, self.device)

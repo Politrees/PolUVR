@@ -4,32 +4,27 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-from collections import defaultdict
-from contextlib import contextmanager
-import math
-import os
-import tempfile
-import typing as tp
-
 import errno
 import functools
 import hashlib
 import inspect
 import io
+import math
 import os
 import random
 import socket
 import tempfile
 import warnings
 import zlib
-
-from diffq import UniformQuantizer, DiffQuantizer
-import torch as th
-import tqdm
-from torch import distributed
-from torch.nn import functional as F
+from collections import defaultdict
+from contextlib import contextmanager
 
 import torch
+import torch as th
+import tqdm
+from diffq import DiffQuantizer, UniformQuantizer
+from torch import distributed
+from torch.nn import functional as F
 
 
 def unfold(a, kernel_size, stride):
@@ -50,9 +45,8 @@ def unfold(a, kernel_size, stride):
     return a.as_strided([*shape, n_frames, kernel_size], strides)
 
 
-def center_trim(tensor: torch.Tensor, reference: tp.Union[torch.Tensor, int]):
-    """
-    Center trim `tensor` with respect to `reference`, along the last dimension.
+def center_trim(tensor: torch.Tensor, reference: torch.Tensor | int):
+    """Center trim `tensor` with respect to `reference`, along the last dimension.
     `reference` can also be a number, representing the length to trim to.
     If the size difference != 0 mod 2, the extra sample is removed on the right side.
     """
@@ -69,7 +63,7 @@ def center_trim(tensor: torch.Tensor, reference: tp.Union[torch.Tensor, int]):
     return tensor
 
 
-def pull_metric(history: tp.List[dict], name: str):
+def pull_metric(history: list[dict], name: str):
     out = []
     for metrics in history:
         metric = metrics
@@ -80,16 +74,15 @@ def pull_metric(history: tp.List[dict], name: str):
 
 
 def EMA(beta: float = 1):
-    """
-    Exponential Moving Average callback.
+    """Exponential Moving Average callback.
     Returns a single function that can be called to repeatidly update the EMA
     with a dict of metrics. The callback will return
     the new averaged dict of metrics.
 
     Note that for `beta=1`, this is just plain averaging.
     """
-    fix: tp.Dict[str, float] = defaultdict(float)
-    total: tp.Dict[str, float] = defaultdict(float)
+    fix: dict[str, float] = defaultdict(float)
+    total: dict[str, float] = defaultdict(float)
 
     def _update(metrics: dict, weight: float = 1) -> dict:
         nonlocal total, fix
@@ -102,8 +95,7 @@ def EMA(beta: float = 1):
 
 
 def sizeof_fmt(num: float, suffix: str = "B"):
-    """
-    Given `num` bytes, return human readable size.
+    """Given `num` bytes, return human readable size.
     Taken from https://stackoverflow.com/a/1094933
     """
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
@@ -127,8 +119,7 @@ def temp_filenames(count: int, delete=True):
 
 
 def average_metric(metric, count=1.0):
-    """
-    Average `metric` which should be a float across all hosts. `count` should be
+    """Average `metric` which should be a float across all hosts. `count` should be
     the weight for this particular host (i.e. number of examples).
     """
     metric = th.tensor([count, count * metric], dtype=th.float32, device="cuda")
@@ -137,8 +128,7 @@ def average_metric(metric, count=1.0):
 
 
 def free_port(host="", low=20000, high=40000):
-    """
-    Return a port number that is most likely free.
+    """Return a port number that is most likely free.
     This could suffer from a race condition although
     it should be quite rare.
     """
@@ -155,8 +145,7 @@ def free_port(host="", low=20000, high=40000):
 
 
 def sizeof_fmt(num, suffix="B"):
-    """
-    Given `num` bytes, return human readable size.
+    """Given `num` bytes, return human readable size.
     Taken from https://stackoverflow.com/a/1094933
     """
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
@@ -167,14 +156,13 @@ def sizeof_fmt(num, suffix="B"):
 
 
 def human_seconds(seconds, display=".2f"):
-    """
-    Given `seconds` seconds, return human readable duration.
+    """Given `seconds` seconds, return human readable duration.
     """
     value = seconds * 1e6
     ratios = [1e3, 1e3, 60, 60, 24]
     names = ["us", "ms", "s", "min", "hrs", "days"]
     last = names.pop(0)
-    for name, ratio in zip(names, ratios):
+    for name, ratio in zip(names, ratios, strict=False):
         if value / ratio < 0.3:
             break
         value /= ratio
@@ -226,14 +214,12 @@ class TensorChunk:
 def tensor_chunk(tensor_or_chunk):
     if isinstance(tensor_or_chunk, TensorChunk):
         return tensor_or_chunk
-    else:
-        assert isinstance(tensor_or_chunk, th.Tensor)
-        return TensorChunk(tensor_or_chunk)
+    assert isinstance(tensor_or_chunk, th.Tensor)
+    return TensorChunk(tensor_or_chunk)
 
 
 def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_progress_bar=None):
-    """
-    Apply model to a given mixture.
+    """Apply model to a given mixture.
 
     Args:
         shifts (int): if > 0, will shift in time `mix` by a random amount between 0 and 0.5 sec
@@ -244,8 +230,8 @@ def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_pro
             and predictions will be performed individually on each and concatenated.
             Useful for model with large memory footprint like Tasnet.
         progress (bool): if True, show a progress bar (requires split=True)
-    """
 
+    """
     channels, length = mix.size()
     device = mix.device
     progress_value = 0
@@ -268,7 +254,7 @@ def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_pro
             out[..., offset : offset + shift] = chunk_out
             offset += shift
         return out
-    elif shifts:
+    if shifts:
         max_shift = int(model.samplerate / 2)
         mix = F.pad(mix, (max_shift, max_shift))
         offsets = list(range(max_shift))
@@ -283,18 +269,16 @@ def apply_model_v1(model, mix, shifts=None, split=False, progress=False, set_pro
             out += shifted_out[..., max_shift - offset : max_shift - offset + length]
         out /= shifts
         return out
-    else:
-        valid_length = model.valid_length(length)
-        delta = valid_length - length
-        padded = F.pad(mix, (delta // 2, delta - delta // 2))
-        with th.no_grad():
-            out = model(padded.unsqueeze(0))[0]
-        return center_trim(out, mix)
+    valid_length = model.valid_length(length)
+    delta = valid_length - length
+    padded = F.pad(mix, (delta // 2, delta - delta // 2))
+    with th.no_grad():
+        out = model(padded.unsqueeze(0))[0]
+    return center_trim(out, mix)
 
 
 def apply_model_v2(model, mix, shifts=None, split=False, overlap=0.25, transition_power=1.0, progress=False, set_progress_bar=None):
-    """
-    Apply model to a given mixture.
+    """Apply model to a given mixture.
 
     Args:
         shifts (int): if > 0, will shift in time `mix` by a random amount between 0 and 0.5 sec
@@ -305,8 +289,8 @@ def apply_model_v2(model, mix, shifts=None, split=False, overlap=0.25, transitio
             and predictions will be performed individually on each and concatenated.
             Useful for model with large memory footprint like Tasnet.
         progress (bool): if True, show a progress bar (requires split=True)
-    """
 
+    """
     assert transition_power >= 1, "transition_power < 1 leads to weird behavior."
     device = mix.device
     channels, length = mix.shape
@@ -344,7 +328,7 @@ def apply_model_v2(model, mix, shifts=None, split=False, overlap=0.25, transitio
         assert sum_weight.min() > 0
         out /= sum_weight
         return out
-    elif shifts:
+    if shifts:
         max_shift = int(0.5 * model.samplerate)
         mix = tensor_chunk(mix)
         padded_mix = mix.padded(length + 2 * max_shift)
@@ -361,13 +345,12 @@ def apply_model_v2(model, mix, shifts=None, split=False, overlap=0.25, transitio
             out += shifted_out[..., max_shift - offset :]
         out /= shifts
         return out
-    else:
-        valid_length = model.valid_length(length)
-        mix = tensor_chunk(mix)
-        padded_mix = mix.padded(valid_length)
-        with th.no_grad():
-            out = model(padded_mix.unsqueeze(0))[0]
-        return center_trim(out, length)
+    valid_length = model.valid_length(length)
+    mix = tensor_chunk(mix)
+    padded_mix = mix.padded(valid_length)
+    with th.no_grad():
+        out = model(padded_mix.unsqueeze(0))[0]
+    return center_trim(out, length)
 
 
 @contextmanager

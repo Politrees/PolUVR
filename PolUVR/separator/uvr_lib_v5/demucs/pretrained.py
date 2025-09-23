@@ -8,21 +8,24 @@
 
 import logging
 from pathlib import Path
-import typing as tp
 
-# from dora.log import fatal
-
-import logging
-
-from diffq import DiffQuantizer
 import torch.hub
 
-from .model import Demucs
-from .tasnet_v2 import ConvTasNet
-from .utils import set_state
+# from dora.log import fatal
+from diffq import DiffQuantizer
 
 from .hdemucs import HDemucs
-from .repo import RemoteRepo, LocalRepo, ModelOnlyRepo, BagOnlyRepo, AnyModelRepo, ModelLoadingError  # noqa
+from .model import Demucs
+from .repo import (  # noqa
+    AnyModelRepo,
+    BagOnlyRepo,
+    LocalRepo,
+    ModelLoadingError,
+    ModelOnlyRepo,
+    RemoteRepo,
+)
+from .tasnet_v2 import ConvTasNet
+from .utils import set_state
 
 logger = logging.getLogger(__name__)
 ROOT_URL = "https://dl.fbaipublicfiles.com/demucs/mdx_final/"
@@ -43,14 +46,14 @@ def add_model_flags(parser):
     parser.add_argument("--repo", type=Path, help="Folder containing all pre-trained models for use with -n.")
 
 
-def _parse_remote_files(remote_file_list) -> tp.Dict[str, str]:
+def _parse_remote_files(remote_file_list) -> dict[str, str]:
     root: str = ""
-    models: tp.Dict[str, str] = {}
+    models: dict[str, str] = {}
     for line in remote_file_list.read_text().split("\n"):
         line = line.strip()
         if line.startswith("#"):
             continue
-        elif line.startswith("root:"):
+        if line.startswith("root:"):
             root = line.split(":", 1)[1].strip()
         else:
             sig = line.split("-", 1)[0]
@@ -59,7 +62,7 @@ def _parse_remote_files(remote_file_list) -> tp.Dict[str, str]:
     return models
 
 
-def get_model(name: str, repo: tp.Optional[Path] = None):
+def get_model(name: str, repo: Path | None = None):
     """`name` must be a bag of models name or a pretrained signature
     from the remote AWS model repo or the specified local repo if `repo` is not None.
     """
@@ -82,8 +85,7 @@ def get_model(name: str, repo: tp.Optional[Path] = None):
 
 
 def get_model_from_args(args):
-    """
-    Load local model package or pre-trained model.
+    """Load local model package or pre-trained model.
     """
     return get_model(name=args.name, repo=args.repo)
 
@@ -116,20 +118,19 @@ def is_pretrained(name):
 def load_pretrained(name):
     if name == "demucs":
         return demucs(pretrained=True)
-    elif name == "demucs48_hq":
+    if name == "demucs48_hq":
         return demucs(pretrained=True, hq=True, channels=48)
-    elif name == "demucs_extra":
+    if name == "demucs_extra":
         return demucs(pretrained=True, extra=True)
-    elif name == "demucs_quantized":
+    if name == "demucs_quantized":
         return demucs(pretrained=True, quantized=True)
-    elif name == "demucs_unittest":
+    if name == "demucs_unittest":
         return demucs_unittest(pretrained=True)
-    elif name == "tasnet":
+    if name == "tasnet":
         return tasnet(pretrained=True)
-    elif name == "tasnet_extra":
+    if name == "tasnet_extra":
         return tasnet(pretrained=True, extra=True)
-    else:
-        raise ValueError(f"Invalid pretrained name {name}")
+    raise ValueError(f"Invalid pretrained name {name}")
 
 
 def _load_state(name, model, quantizer=None):

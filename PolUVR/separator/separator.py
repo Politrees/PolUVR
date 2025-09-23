@@ -1,30 +1,28 @@
-""" This file contains the Separator class, to facilitate the separation of stems from audio. """
-
-from importlib import metadata, resources
-import os
-import sys
-import platform
-import subprocess
-import time
-import logging
-import warnings
-import importlib
-import io
-from typing import Optional
+"""This file contains the Separator class, to facilitate the separation of stems from audio."""
 
 import hashlib
+import importlib
+import io
 import json
-import yaml
+import logging
+import os
+import platform
+import subprocess
+import sys
+import time
+import warnings
+from importlib import metadata, resources
+
+import onnxruntime as ort
 import requests
 import torch
-import torch.amp.autocast_mode as autocast_mode
-import onnxruntime as ort
+import yaml
+from torch.amp import autocast_mode
 from tqdm import tqdm
 
 
 class Separator:
-    """
-    The Separator class is designed to facilitate the separation of audio sources from a given audio file.
+    """The Separator class is designed to facilitate the separation of audio sources from a given audio file.
     It supports various separation architectures and models, including MDX, VR, and Demucs. The class provides
     functionalities to configure separation parameters, load models, and perform audio source separation.
     It also handles logging, normalization, and output formatting of the separated audio stems.
@@ -191,7 +189,7 @@ class Separator:
 
         self.invert_using_spec = invert_using_spec
         if self.invert_using_spec:
-            self.logger.debug(f"Secondary step will be inverted using spectogram rather than waveform. This may improve quality but is slightly slower.")
+            self.logger.debug("Secondary step will be inverted using spectogram rather than waveform. This may improve quality but is slightly slower.")
 
         try:
             self.sample_rate = int(sample_rate)
@@ -223,8 +221,7 @@ class Separator:
             self.setup_accelerated_inferencing_device()
 
     def setup_accelerated_inferencing_device(self):
-        """
-        This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available.
+        """This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available.
         """
         system_info = self.get_system_info()
         self.check_ffmpeg_installed()
@@ -232,8 +229,7 @@ class Separator:
         self.setup_torch_device(system_info)
 
     def get_system_info(self):
-        """
-        This method logs the system information, including the operating system, CPU archutecture and Python version
+        """This method logs the system information, including the operating system, CPU archutecture and Python version
         """
         os_name = platform.system()
         os_version = platform.version()
@@ -250,8 +246,7 @@ class Separator:
         return system_info
 
     def check_ffmpeg_installed(self):
-        """
-        This method checks if ffmpeg is installed and logs its version.
+        """This method checks if ffmpeg is installed and logs its version.
         """
         try:
             ffmpeg_version_output = subprocess.check_output(["ffmpeg", "-version"], text=True)
@@ -265,8 +260,7 @@ class Separator:
                 raise
 
     def log_onnxruntime_packages(self):
-        """
-        This method logs the ONNX Runtime package versions, including the GPU and Silicon packages if available.
+        """This method logs the ONNX Runtime package versions, including the GPU and Silicon packages if available.
         """
         onnxruntime_gpu_package = self.get_package_distribution("onnxruntime-gpu")
         onnxruntime_silicon_package = self.get_package_distribution("onnxruntime-silicon")
@@ -280,8 +274,7 @@ class Separator:
             self.logger.info(f"ONNX Runtime CPU package installed with version: {onnxruntime_cpu_package.version}")
 
     def setup_torch_device(self, system_info):
-        """
-        This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available.
+        """This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available.
         """
         hardware_acceleration_enabled = False
         ort_providers = ort.get_available_providers()
@@ -301,8 +294,7 @@ class Separator:
             self.onnx_execution_provider = ["CPUExecutionProvider"]
 
     def configure_cuda(self, ort_providers):
-        """
-        This method configures the CUDA device for PyTorch and ONNX Runtime, if available.
+        """This method configures the CUDA device for PyTorch and ONNX Runtime, if available.
         """
         self.logger.info("CUDA is available in Torch, setting Torch device to CUDA")
         self.torch_device = torch.device("cuda")
@@ -313,8 +305,7 @@ class Separator:
             self.logger.warning("CUDAExecutionProvider not available in ONNXruntime, so acceleration will NOT be enabled")
 
     def configure_mps(self, ort_providers):
-        """
-        This method configures the Apple Silicon MPS/CoreML device for PyTorch and ONNX Runtime, if available.
+        """This method configures the Apple Silicon MPS/CoreML device for PyTorch and ONNX Runtime, if available.
         """
         self.logger.info("Apple Silicon MPS/CoreML is available in Torch and processor is ARM, setting Torch device to MPS")
         self.torch_device_mps = torch.device("mps")
@@ -328,8 +319,7 @@ class Separator:
             self.logger.warning("CoreMLExecutionProvider not available in ONNXruntime, so acceleration will NOT be enabled")
 
     def get_package_distribution(self, package_name):
-        """
-        This method returns the package distribution for a given package name if installed, or None otherwise.
+        """This method returns the package distribution for a given package name if installed, or None otherwise.
         """
         try:
             return metadata.distribution(package_name)
@@ -338,8 +328,7 @@ class Separator:
             return None
 
     def get_model_hash(self, model_path):
-        """
-        This method returns the MD5 hash of a given model file.
+        """This method returns the MD5 hash of a given model file.
         """
         self.logger.debug(f"Calculating hash of model file {model_path}")
 
@@ -372,10 +361,8 @@ class Separator:
             raise # Re-raise other errors
 
     def download_file_if_not_exists(self, url, output_path):
+        """This method downloads a file from a given URL to a given output path, if the file does not already exist.
         """
-        This method downloads a file from a given URL to a given output path, if the file does not already exist.
-        """
-
         if os.path.isfile(output_path):
             self.logger.debug(f"File already exists at {output_path}, skipping download")
             return
@@ -397,24 +384,23 @@ class Separator:
             raise RuntimeError(f"Failed to download file from {url}, response code: {response.status_code}")
 
     def list_supported_model_files(self):
-        """
-        This method lists the supported model files for PolUVR, by fetching the same file UVR uses to list these.
+        """This method lists the supported model files for PolUVR, by fetching the same file UVR uses to list these.
         Also includes model performance scores where available.
         """
         download_checks_path = os.path.join(self.model_file_dir, "model_list_links.json")
         self.download_file_if_not_exists("https://raw.githubusercontent.com/Politrees/UVR_resources/main/UVR_resources/model_list_links.json", download_checks_path)
 
         model_downloads_list = json.load(open(download_checks_path, encoding="utf-8"))
-        self.logger.debug(f"UVR model download list loaded")
+        self.logger.debug("UVR model download list loaded")
 
         # Load the model scores with error handling
         model_scores = {}
         try:
             with resources.open_text("PolUVR", "models-scores.json") as f:
                 model_scores = json.load(f)
-            self.logger.debug(f"Model scores loaded")
+            self.logger.debug("Model scores loaded")
         except json.JSONDecodeError as e:
-            self.logger.warning(f"Failed to load model scores: {str(e)}")
+            self.logger.warning(f"Failed to load model scores: {e!s}")
             self.logger.warning("Continuing without model scores")
 
         # Only show Demucs v4 models as we've only implemented support for v4
@@ -434,7 +420,7 @@ class Separator:
                     "target_stem": model_score_data.get("target_stem"),
                     "download_files": list(files.values()),  # List of all download URLs/filenames
                 }
-        self.logger.debug(f"PolUVR model list loaded")
+        self.logger.debug("PolUVR model list loaded")
 
         # Return object with list of model names
         model_files_grouped_by_type = {
@@ -481,16 +467,14 @@ class Separator:
         return model_files_grouped_by_type
 
     def print_uvr_vip_message(self):
-        """
-        This method prints a message to the user if they have downloaded a VIP model, reminding them to support Anjok07 on Patreon.
+        """This method prints a message to the user if they have downloaded a VIP model, reminding them to support Anjok07 on Patreon.
         """
         if self.model_is_uvr_vip:
             self.logger.warning(f"The model: '{self.model_friendly_name}' is a VIP model, intended by Anjok07 for access by paying subscribers only.")
             self.logger.warning("If you are not already subscribed, please consider supporting the developer of UVR, Anjok07 by subscribing here: https://patreon.com/uvr")
 
     def download_model_files(self, model_filename):
-        """
-        This method downloads the model files for a given model filename, if they are not already present.
+        """This method downloads the model files for a given model filename, if they are not already present.
         Returns tuple of (model_filename, model_type, model_friendly_name, model_path, yaml_config_filename)
         """
         model_path = os.path.join(self.model_file_dir, f"{model_filename}")
@@ -529,8 +513,7 @@ class Separator:
         raise ValueError(f"Model file {model_filename} not found in supported model files")
 
     def load_model_data_from_yaml(self, yaml_config_filename):
-        """
-        This method loads model-specific parameters from the YAML file for that model.
+        """This method loads model-specific parameters from the YAML file for that model.
         The parameters in the YAML are critical to inferencing, as they need to match whatever was used during training.
         """
         # Verify if the YAML filename includes a full path or just the filename
@@ -550,8 +533,7 @@ class Separator:
         return model_data
 
     def load_model_data_using_hash(self, model_path):
-        """
-        This method loads model-specific parameters from UVR model data files.
+        """This method loads model-specific parameters from UVR model data files.
         These parameters are critical to inferencing using a given model, as they need to match whatever was used during training.
         The correct parameters are identified by calculating the hash of the model file and looking up the hash in the UVR data files.
         """
@@ -592,8 +574,7 @@ class Separator:
         return model_data
 
     def load_model(self, model_filename="model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt"):
-        """
-        This method instantiates the architecture-specific separation class,
+        """This method instantiates the architecture-specific separation class,
         loading the separation model into memory, downloading it first if necessary.
         """
         self.logger.info(f"Loading model {model_filename}...")
@@ -662,19 +643,21 @@ class Separator:
         self.logger.info(f'Load model duration: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - load_model_start_time)))}')
 
     def separate(self, audio_file_path, custom_output_names=None):
-        """
-        Separates the audio file(s) into different stems (e.g., vocals, instruments) using the loaded model.
+        """Separates the audio file(s) into different stems (e.g., vocals, instruments) using the loaded model.
 
         This method takes the path to an audio file or a directory containing audio files, processes them through
         the loaded separation model, and returns the paths to the output files containing the separated audio stems.
         It handles the entire flow from loading the audio, running the separation, clearing up resources, and logging the process.
 
-        Parameters:
+        Parameters
+        ----------
         - audio_file_path (str or list): The path to the audio file or directory, or a list of paths.
         - custom_output_names (dict, optional): Custom names for the output files. Defaults to None.
 
-        Returns:
+        Returns
+        -------
         - output_files (list of str): A list containing the paths to the separated audio stem files.
+
         """
         # Check if the model and device are properly initialized
         if not (self.torch_device and self.model_instance):
@@ -715,18 +698,20 @@ class Separator:
         return output_files
 
     def _separate_file(self, audio_file_path, custom_output_names=None):
-        """
-        Internal method to handle separation for a single audio file.
+        """Internal method to handle separation for a single audio file.
 
         This method performs the actual separation process for a single audio file. It logs the start and end of the process,
         handles autocast if enabled, and ensures GPU cache is cleared after processing.
 
-        Parameters:
+        Parameters
+        ----------
         - audio_file_path (str): The path to the audio file.
         - custom_output_names (dict, optional): Custom names for the output files. Defaults to None.
 
-        Returns:
+        Returns
+        -------
         - output_files (list of str): A list containing the paths to the separated audio stem files.
+
         """
         # Log the start of the separation process
         self.logger.info(f"Starting separation process for audio_file_path: {audio_file_path}")
@@ -762,8 +747,7 @@ class Separator:
         return output_files
 
     def download_model_and_data(self, model_filename):
-        """
-        Downloads the model file without loading it into memory.
+        """Downloads the model file without loading it into memory.
         """
         self.logger.info(f"Downloading model {model_filename}...")
 
@@ -781,9 +765,8 @@ class Separator:
 
         self.logger.info(f"Model downloaded, type: {model_type}, friendly name: {model_friendly_name}, model_path: {model_path}, model_data: {model_data_dict_size} items")
 
-    def get_simplified_model_list(self, filter_sort_by: Optional[str] = None):
-        """
-        Returns a simplified, user-friendly list of models with their key metrics.
+    def get_simplified_model_list(self, filter_sort_by: str | None = None):
+        """Returns a simplified, user-friendly list of models with their key metrics.
         Optionally sorts the list based on the specified criteria.
 
         :param sort_by: Criteria to sort by. Can be "name", "filename", or any stem name
@@ -828,19 +811,18 @@ class Separator:
         if filter_sort_by:
             if filter_sort_by == "name":
                 return dict(sorted(simplified_list.items(), key=lambda x: x[1]["Name"]))
-            elif filter_sort_by == "filename":
+            if filter_sort_by == "filename":
                 return dict(sorted(simplified_list.items()))
-            else:
-                # Convert sort_by to lowercase for case-insensitive comparison
-                sort_by_lower = filter_sort_by.lower()
-                # Filter out models that don't have the specified stem
-                filtered_list = {k: v for k, v in simplified_list.items() if sort_by_lower in v["SDR"]}
+            # Convert sort_by to lowercase for case-insensitive comparison
+            sort_by_lower = filter_sort_by.lower()
+            # Filter out models that don't have the specified stem
+            filtered_list = {k: v for k, v in simplified_list.items() if sort_by_lower in v["SDR"]}
 
-                # Sort by SDR score if available, putting None values last
-                def sort_key(item):
-                    sdr = item[1]["SDR"][sort_by_lower]
-                    return (0 if sdr is None else 1, sdr if sdr is not None else float("-inf"))
+            # Sort by SDR score if available, putting None values last
+            def sort_key(item):
+                sdr = item[1]["SDR"][sort_by_lower]
+                return (0 if sdr is None else 1, sdr if sdr is not None else float("-inf"))
 
-                return dict(sorted(filtered_list.items(), key=sort_key, reverse=True))
+            return dict(sorted(filtered_list.items(), key=sort_key, reverse=True))
 
         return simplified_list

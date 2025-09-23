@@ -1,7 +1,8 @@
 import unittest
-import numpy as np
-import torch
 from unittest.mock import Mock
+
+import torch
+
 from PolUVR.separator.uvr_lib_v5.stft import STFT
 
 # Short-Time Fourier Transform (STFT) Process Overview:

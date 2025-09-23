@@ -4,29 +4,26 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 # First author is Simon Rouard.
-"""
-This code contains the spectrogram and Hybrid version of Demucs.
+"""This code contains the spectrogram and Hybrid version of Demucs.
 """
 import math
+from fractions import Fraction
 
-from .filtering import wiener
 import torch
+from einops import rearrange
 from torch import nn
 from torch.nn import functional as F
-from fractions import Fraction
-from einops import rearrange
-
-from .transformer import CrossTransformerEncoder
 
 from .demucs import rescale_module
+from .filtering import wiener
+from .hdemucs import HDecLayer, HEncLayer, MultiWrap, ScaledEmbedding, pad1d
+from .spec import ispectro, spectro
 from .states import capture_init
-from .spec import spectro, ispectro
-from .hdemucs import pad1d, ScaledEmbedding, HEncLayer, MultiWrap, HDecLayer
+from .transformer import CrossTransformerEncoder
 
 
 class HTDemucs(nn.Module):
-    """
-    Spectrogram and hybrid Demucs model.
+    """Spectrogram and hybrid Demucs model.
     The spectrogram model has the same structure as Demucs, except the first few layers are over the
     frequency axis, until there is only 1 frequency, and then it moves to time convolutions.
     Frequency layers can still access information across time steps thanks to the DConv residual.
@@ -131,94 +128,94 @@ class HTDemucs(nn.Module):
         segment=10,
         use_train_segment=True,
     ):
-        """
-        Args:
-            sources (list[str]): list of source names.
-            audio_channels (int): input/output audio channels.
-            channels (int): initial number of hidden channels.
-            channels_time: if not None, use a different `channels` value for the time branch.
-            growth: increase the number of hidden channels by this factor at each layer.
-            nfft: number of fft bins. Note that changing this require careful computation of
-                various shape parameters and will not work out of the box for hybrid models.
-            wiener_iters: when using Wiener filtering, number of iterations at test time.
-            end_iters: same but at train time. For a hybrid model, must be equal to `wiener_iters`.
-            wiener_residual: add residual source before wiener filtering.
-            cac: uses complex as channels, i.e. complex numbers are 2 channels each
-                in input and output. no further processing is done before ISTFT.
-            depth (int): number of layers in the encoder and in the decoder.
-            rewrite (bool): add 1x1 convolution to each layer.
-            multi_freqs: list of frequency ratios for splitting frequency bands with `MultiWrap`.
-            multi_freqs_depth: how many layers to wrap with `MultiWrap`. Only the outermost
-                layers will be wrapped.
-            freq_emb: add frequency embedding after the first frequency layer if > 0,
-                the actual value controls the weight of the embedding.
-            emb_scale: equivalent to scaling the embedding learning rate
-            emb_smooth: initialize the embedding with a smooth one (with respect to frequencies).
-            kernel_size: kernel_size for encoder and decoder layers.
-            stride: stride for encoder and decoder layers.
-            time_stride: stride for the final time layer, after the merge.
-            context: context for 1x1 conv in the decoder.
-            context_enc: context for 1x1 conv in the encoder.
-            norm_starts: layer at which group norm starts being used.
-                decoder layers are numbered in reverse order.
-            norm_groups: number of groups for group norm.
-            dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
-            dconv_depth: depth of residual DConv branch.
-            dconv_comp: compression of DConv branch.
-            dconv_attn: adds attention layers in DConv branch starting at this layer.
-            dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
-            dconv_init: initial scale for the DConv branch LayerScale.
-            bottom_channels: if >0 it adds a linear layer (1x1 Conv) before and after the
-                transformer in order to change the number of channels
-            t_layers: number of layers in each branch (waveform and spec) of the transformer
-            t_emb: "sin", "cape" or "scaled"
-            t_hidden_scale: the hidden scale of the Feedforward parts of the transformer
-                for instance if C = 384 (the number of channels in the transformer) and
-                t_hidden_scale = 4.0 then the intermediate layer of the FFN has dimension
-                384 * 4 = 1536
-            t_heads: number of heads for the transformer
-            t_dropout: dropout in the transformer
-            t_max_positions: max_positions for the "scaled" positional embedding, only
-                useful if t_emb="scaled"
-            t_norm_in: (bool) norm before addinf positional embedding and getting into the
-                transformer layers
-            t_norm_in_group: (bool) if True while t_norm_in=True, the norm is on all the
-                timesteps (GroupNorm with group=1)
-            t_group_norm: (bool) if True, the norms of the Encoder Layers are on all the
-                timesteps (GroupNorm with group=1)
-            t_norm_first: (bool) if True the norm is before the attention and before the FFN
-            t_norm_out: (bool) if True, there is a GroupNorm (group=1) at the end of each layer
-            t_max_period: (float) denominator in the sinusoidal embedding expression
-            t_weight_decay: (float) weight decay for the transformer
-            t_lr: (float) specific learning rate for the transformer
-            t_layer_scale: (bool) Layer Scale for the transformer
-            t_gelu: (bool) activations of the transformer are GeLU if True, ReLU else
-            t_weight_pos_embed: (float) weighting of the positional embedding
-            t_cape_mean_normalize: (bool) if t_emb="cape", normalisation of positional embeddings
-                see: https://arxiv.org/abs/2106.03143
-            t_cape_augment: (bool) if t_emb="cape", must be True during training and False
-                during the inference, see: https://arxiv.org/abs/2106.03143
-            t_cape_glob_loc_scale: (list of 3 floats) if t_emb="cape", CAPE parameters
-                see: https://arxiv.org/abs/2106.03143
-            t_sparse_self_attn: (bool) if True, the self attentions are sparse
-            t_sparse_cross_attn: (bool) if True, the cross-attentions are sparse (don't use it
-                unless you designed really specific masks)
-            t_mask_type: (str) can be "diag", "jmask", "random", "global" or any combination
-                with '_' between: i.e. "diag_jmask_random" (note that this is permutation
-                invariant i.e. "diag_jmask_random" is equivalent to "jmask_random_diag")
-            t_mask_random_seed: (int) if "random" is in t_mask_type, controls the seed
-                that generated the random part of the mask
-            t_sparse_attn_window: (int) if "diag" is in t_mask_type, for a query (i), and
-                a key (j), the mask is True id |i-j|<=t_sparse_attn_window
-            t_global_window: (int) if "global" is in t_mask_type, mask[:t_global_window, :]
-                and mask[:, :t_global_window] will be True
-            t_sparsity: (float) if "random" is in t_mask_type, t_sparsity is the sparsity
-                level of the random part of the mask.
-            t_cross_first: (bool) if True cross attention is the first layer of the
-                transformer (False seems to be better)
-            rescale: weight rescaling trick
-            use_train_segment: (bool) if True, the actual size that is used during the
-                training is used during inference.
+        """Args:
+        sources (list[str]): list of source names.
+        audio_channels (int): input/output audio channels.
+        channels (int): initial number of hidden channels.
+        channels_time: if not None, use a different `channels` value for the time branch.
+        growth: increase the number of hidden channels by this factor at each layer.
+        nfft: number of fft bins. Note that changing this require careful computation of
+            various shape parameters and will not work out of the box for hybrid models.
+        wiener_iters: when using Wiener filtering, number of iterations at test time.
+        end_iters: same but at train time. For a hybrid model, must be equal to `wiener_iters`.
+        wiener_residual: add residual source before wiener filtering.
+        cac: uses complex as channels, i.e. complex numbers are 2 channels each
+            in input and output. no further processing is done before ISTFT.
+        depth (int): number of layers in the encoder and in the decoder.
+        rewrite (bool): add 1x1 convolution to each layer.
+        multi_freqs: list of frequency ratios for splitting frequency bands with `MultiWrap`.
+        multi_freqs_depth: how many layers to wrap with `MultiWrap`. Only the outermost
+            layers will be wrapped.
+        freq_emb: add frequency embedding after the first frequency layer if > 0,
+            the actual value controls the weight of the embedding.
+        emb_scale: equivalent to scaling the embedding learning rate
+        emb_smooth: initialize the embedding with a smooth one (with respect to frequencies).
+        kernel_size: kernel_size for encoder and decoder layers.
+        stride: stride for encoder and decoder layers.
+        time_stride: stride for the final time layer, after the merge.
+        context: context for 1x1 conv in the decoder.
+        context_enc: context for 1x1 conv in the encoder.
+        norm_starts: layer at which group norm starts being used.
+            decoder layers are numbered in reverse order.
+        norm_groups: number of groups for group norm.
+        dconv_mode: if 1: dconv in encoder only, 2: decoder only, 3: both.
+        dconv_depth: depth of residual DConv branch.
+        dconv_comp: compression of DConv branch.
+        dconv_attn: adds attention layers in DConv branch starting at this layer.
+        dconv_lstm: adds a LSTM layer in DConv branch starting at this layer.
+        dconv_init: initial scale for the DConv branch LayerScale.
+        bottom_channels: if >0 it adds a linear layer (1x1 Conv) before and after the
+            transformer in order to change the number of channels
+        t_layers: number of layers in each branch (waveform and spec) of the transformer
+        t_emb: "sin", "cape" or "scaled"
+        t_hidden_scale: the hidden scale of the Feedforward parts of the transformer
+            for instance if C = 384 (the number of channels in the transformer) and
+            t_hidden_scale = 4.0 then the intermediate layer of the FFN has dimension
+            384 * 4 = 1536
+        t_heads: number of heads for the transformer
+        t_dropout: dropout in the transformer
+        t_max_positions: max_positions for the "scaled" positional embedding, only
+            useful if t_emb="scaled"
+        t_norm_in: (bool) norm before addinf positional embedding and getting into the
+            transformer layers
+        t_norm_in_group: (bool) if True while t_norm_in=True, the norm is on all the
+            timesteps (GroupNorm with group=1)
+        t_group_norm: (bool) if True, the norms of the Encoder Layers are on all the
+            timesteps (GroupNorm with group=1)
+        t_norm_first: (bool) if True the norm is before the attention and before the FFN
+        t_norm_out: (bool) if True, there is a GroupNorm (group=1) at the end of each layer
+        t_max_period: (float) denominator in the sinusoidal embedding expression
+        t_weight_decay: (float) weight decay for the transformer
+        t_lr: (float) specific learning rate for the transformer
+        t_layer_scale: (bool) Layer Scale for the transformer
+        t_gelu: (bool) activations of the transformer are GeLU if True, ReLU else
+        t_weight_pos_embed: (float) weighting of the positional embedding
+        t_cape_mean_normalize: (bool) if t_emb="cape", normalisation of positional embeddings
+            see: https://arxiv.org/abs/2106.03143
+        t_cape_augment: (bool) if t_emb="cape", must be True during training and False
+            during the inference, see: https://arxiv.org/abs/2106.03143
+        t_cape_glob_loc_scale: (list of 3 floats) if t_emb="cape", CAPE parameters
+            see: https://arxiv.org/abs/2106.03143
+        t_sparse_self_attn: (bool) if True, the self attentions are sparse
+        t_sparse_cross_attn: (bool) if True, the cross-attentions are sparse (don't use it
+            unless you designed really specific masks)
+        t_mask_type: (str) can be "diag", "jmask", "random", "global" or any combination
+            with '_' between: i.e. "diag_jmask_random" (note that this is permutation
+            invariant i.e. "diag_jmask_random" is equivalent to "jmask_random_diag")
+        t_mask_random_seed: (int) if "random" is in t_mask_type, controls the seed
+            that generated the random part of the mask
+        t_sparse_attn_window: (int) if "diag" is in t_mask_type, for a query (i), and
+            a key (j), the mask is True id |i-j|<=t_sparse_attn_window
+        t_global_window: (int) if "global" is in t_mask_type, mask[:t_global_window, :]
+            and mask[:, :t_global_window] will be True
+        t_sparsity: (float) if "random" is in t_mask_type, t_sparsity is the sparsity
+            level of the random part of the mask.
+        t_cross_first: (bool) if True cross attention is the first layer of the
+            transformer (False seems to be better)
+        rescale: weight rescaling trick
+        use_train_segment: (bool) if True, the actual size that is used during the
+            training is used during inference.
+
         """
         super().__init__()
         self.cac = cac
@@ -437,8 +434,7 @@ class HTDemucs(nn.Module):
         if niters < 0:
             z = z[:, None]
             return z / (1e-8 + z.abs()) * m
-        else:
-            return self._wiener(m, z, niters)
+        return self._wiener(m, z, niters)
 
     def _wiener(self, mag_out, mix_stft, niters):
         # apply wiener filtering from OpenUnmix.
@@ -467,8 +463,7 @@ class HTDemucs(nn.Module):
         return out.to(init)
 
     def valid_length(self, length: int):
-        """
-        Return a length that is appropriate for evaluation.
+        """Return a length that is appropriate for evaluation.
         In our case, always return the training length, unless
         it is smaller than the given length, in which case this
         raises an error.
@@ -477,7 +472,7 @@ class HTDemucs(nn.Module):
             return length
         training_length = int(self.segment * self.samplerate)
         if training_length < length:
-            raise ValueError(f"Given length {length} is longer than " f"training length {training_length}")
+            raise ValueError(f"Given length {length} is longer than training length {training_length}")
         return training_length
 
     def forward(self, mix):
@@ -588,7 +583,7 @@ class HTDemucs(nn.Module):
 
         device_type = x.device.type
         device_load = f"{device_type}:{x.device.index}" if not device_type == "mps" else device_type
-        x_is_other_gpu = not device_type in ["cuda", "cpu"]
+        x_is_other_gpu = device_type not in ["cuda", "cpu"]
 
         if x_is_other_gpu:
             x = x.cpu()

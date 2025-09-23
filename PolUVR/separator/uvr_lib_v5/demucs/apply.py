@@ -3,22 +3,21 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-"""
-Code to apply a model to a mix. It will handle chunking with overlaps and
+"""Code to apply a model to a mix. It will handle chunking with overlaps and
 inteprolation between chunks, as well as the "shift trick".
 """
-from concurrent.futures import ThreadPoolExecutor
 import random
 import typing as tp
+from concurrent.futures import ThreadPoolExecutor
 
 import torch as th
+import tqdm
 from torch import nn
 from torch.nn import functional as F
-import tqdm
 
 from .demucs import Demucs
 from .hdemucs import HDemucs
-from .utils import center_trim, DummyPoolExecutor
+from .utils import DummyPoolExecutor, center_trim
 
 Model = tp.Union[Demucs, HDemucs]
 
@@ -26,9 +25,8 @@ progress_bar_num = 0
 
 
 class BagOfModels(nn.Module):
-    def __init__(self, models: tp.List[Model], weights: tp.Optional[tp.List[tp.List[float]]] = None, segment: tp.Optional[float] = None):
-        """
-        Represents a bag of models with specific weights.
+    def __init__(self, models: list[Model], weights: list[list[float]] | None = None, segment: float | None = None):
+        """Represents a bag of models with specific weights.
         You should call `apply_model` rather than calling directly the forward here for
         optimal performance.
 
@@ -39,8 +37,8 @@ class BagOfModels(nn.Module):
                 each containing S floats (S number of sources).
             segment (None or float): overrides the `segment` attribute of each model
                 (this is performed inplace, be careful if you reuse the models passed).
-        """
 
+        """
         super().__init__()
         assert len(models) > 0
         first = models[0]
@@ -116,14 +114,12 @@ class TensorChunk:
 def tensor_chunk(tensor_or_chunk):
     if isinstance(tensor_or_chunk, TensorChunk):
         return tensor_or_chunk
-    else:
-        assert isinstance(tensor_or_chunk, th.Tensor)
-        return TensorChunk(tensor_or_chunk)
+    assert isinstance(tensor_or_chunk, th.Tensor)
+    return TensorChunk(tensor_or_chunk)
 
 
 def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power=1.0, static_shifts=1, set_progress_bar=None, device=None, progress=False, num_workers=0, pool=None):
-    """
-    Apply model to a given mixture.
+    """Apply model to a given mixture.
 
     Args:
         shifts (int): if > 0, will shift in time `mix` by a random amount between 0 and 0.5 sec
@@ -138,8 +134,8 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
             execute the computation, otherwise `mix.device` is assumed.
             When `device` is different from `mix.device`, only local computations will
             be on `device`, while the entire tracks will be stored on `mix.device`.
-    """
 
+    """
     global fut_length
     global bag_num
     global prog_bar
@@ -177,7 +173,7 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
         fut_length = 0
         prog_bar = 0
         current_model = 0  # (bag_num + 1)
-        for sub_model, weight in zip(model.models, model.weights):
+        for sub_model, weight in zip(model.models, model.weights, strict=False):
             original_model_device = next(iter(sub_model.parameters())).device
             sub_model.to(device)
             fut_length += fut_length
@@ -212,7 +208,7 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
             out += shifted_out[..., max_shift - offset :]
         out /= shifts
         return out
-    elif split:
+    if split:
         kwargs["split"] = False
         out = th.zeros(batch, len(model.sources), channels, length, device=mix.device)
         sum_weight = th.zeros(length, device=mix.device)
@@ -248,16 +244,15 @@ def apply_model(model, mix, shifts=1, split=True, overlap=0.25, transition_power
         assert sum_weight.min() > 0
         out /= sum_weight
         return out
+    if hasattr(model, "valid_length"):
+        valid_length = model.valid_length(length)
     else:
-        if hasattr(model, "valid_length"):
-            valid_length = model.valid_length(length)
-        else:
-            valid_length = length
-        mix = tensor_chunk(mix)
-        padded_mix = mix.padded(valid_length).to(device)
-        with th.no_grad():
-            out = model(padded_mix)
-        return center_trim(out, length)
+        valid_length = length
+    mix = tensor_chunk(mix)
+    padded_mix = mix.padded(valid_length).to(device)
+    with th.no_grad():
+        out = model(padded_mix)
+    return center_trim(out, length)
 
 
 def demucs_segments(demucs_segment, demucs_model):
@@ -268,9 +263,8 @@ def demucs_segments(demucs_segment, demucs_model):
             if segment is not None:
                 for sub in demucs_model.models:
                     sub.segment = segment
-        else:
-            if segment is not None:
-                sub.segment = segment
+        elif segment is not None:
+            sub.segment = segment
     else:
         try:
             segment = int(demucs_segment)
@@ -278,17 +272,15 @@ def demucs_segments(demucs_segment, demucs_model):
                 if segment is not None:
                     for sub in demucs_model.models:
                         sub.segment = segment
-            else:
-                if segment is not None:
-                    sub.segment = segment
+            elif segment is not None:
+                sub.segment = segment
         except:
             segment = None
             if isinstance(demucs_model, BagOfModels):
                 if segment is not None:
                     for sub in demucs_model.models:
                         sub.segment = segment
-            else:
-                if segment is not None:
-                    sub.segment = segment
+            elif segment is not None:
+                sub.segment = segment
 
     return demucs_model

@@ -13,7 +13,7 @@ def spectro(x, n_fft=512, hop_length=None, pad=0):
     x = x.reshape(-1, length)
 
     device_type = x.device.type
-    is_other_gpu = not device_type in ["cuda", "cpu"]
+    is_other_gpu = device_type not in ["cuda", "cpu"]
 
     if is_other_gpu:
         x = x.cpu()
@@ -29,7 +29,7 @@ def ispectro(z, hop_length=None, length=None, pad=0):
     win_length = n_fft // (1 + pad)
 
     device_type = z.device.type
-    is_other_gpu = not device_type in ["cuda", "cpu"]
+    is_other_gpu = device_type not in ["cuda", "cpu"]
 
     if is_other_gpu:
         z = z.cpu()

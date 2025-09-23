@@ -33,8 +33,8 @@
 import math
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 from .utils import capture_init
 
@@ -66,19 +66,19 @@ def overlap_and_add(signal, frame_step):
 class ConvTasNet(nn.Module):
     @capture_init
     def __init__(self, N=256, L=20, B=256, H=512, P=3, X=8, R=4, C=4, audio_channels=1, samplerate=44100, norm_type="gLN", causal=False, mask_nonlinear="relu"):
-        """
-        Args:
-            N: Number of filters in autoencoder
-            L: Length of the filters (in samples)
-            B: Number of channels in bottleneck 1 × 1-conv block
-            H: Number of channels in convolutional blocks
-            P: Kernel size in convolutional blocks
-            X: Number of convolutional blocks in each repeat
-            R: Number of repeats
-            C: Number of speakers
-            norm_type: BN, gLN, cLN
-            causal: causal or non-causal
-            mask_nonlinear: use which non-linear function to generate mask
+        """Args:
+        N: Number of filters in autoencoder
+        L: Length of the filters (in samples)
+        B: Number of channels in bottleneck 1 × 1-conv block
+        H: Number of channels in convolutional blocks
+        P: Kernel size in convolutional blocks
+        X: Number of convolutional blocks in each repeat
+        R: Number of repeats
+        C: Number of speakers
+        norm_type: BN, gLN, cLN
+        causal: causal or non-causal
+        mask_nonlinear: use which non-linear function to generate mask
+
         """
         super(ConvTasNet, self).__init__()
         # Hyper-parameter
@@ -101,11 +101,11 @@ class ConvTasNet(nn.Module):
         return length
 
     def forward(self, mixture):
-        """
-        Args:
+        """Args:
             mixture: [M, T], M is batch size, T is #samples
         Returns:
             est_source: [M, C, T]
+
         """
         mixture_w = self.encoder(mixture)
         est_mask = self.separator(mixture_w)
@@ -130,11 +130,11 @@ class Encoder(nn.Module):
         self.conv1d_U = nn.Conv1d(audio_channels, N, kernel_size=L, stride=L // 2, bias=False)
 
     def forward(self, mixture):
-        """
-        Args:
+        """Args:
             mixture: [M, T], M is batch size, T is #samples
         Returns:
             mixture_w: [M, N, K], where K = (T-L)/(L/2)+1 = 2T/L-1
+
         """
         mixture_w = F.relu(self.conv1d_U(mixture))  # [M, N, K]
         return mixture_w
@@ -150,12 +150,13 @@ class Decoder(nn.Module):
         self.basis_signals = nn.Linear(N, audio_channels * L, bias=False)
 
     def forward(self, mixture_w, est_mask):
-        """
-        Args:
+        """Args:
             mixture_w: [M, N, K]
             est_mask: [M, C, N, K]
+
         Returns:
             est_source: [M, C, T]
+
         """
         # D = W * M
         source_w = torch.unsqueeze(mixture_w, 1) * est_mask  # [M, C, N, K]
@@ -170,18 +171,18 @@ class Decoder(nn.Module):
 
 class TemporalConvNet(nn.Module):
     def __init__(self, N, B, H, P, X, R, C, norm_type="gLN", causal=False, mask_nonlinear="relu"):
-        """
-        Args:
-            N: Number of filters in autoencoder
-            B: Number of channels in bottleneck 1 × 1-conv block
-            H: Number of channels in convolutional blocks
-            P: Kernel size in convolutional blocks
-            X: Number of convolutional blocks in each repeat
-            R: Number of repeats
-            C: Number of speakers
-            norm_type: BN, gLN, cLN
-            causal: causal or non-causal
-            mask_nonlinear: use which non-linear function to generate mask
+        """Args:
+        N: Number of filters in autoencoder
+        B: Number of channels in bottleneck 1 × 1-conv block
+        H: Number of channels in convolutional blocks
+        P: Kernel size in convolutional blocks
+        X: Number of convolutional blocks in each repeat
+        R: Number of repeats
+        C: Number of speakers
+        norm_type: BN, gLN, cLN
+        causal: causal or non-causal
+        mask_nonlinear: use which non-linear function to generate mask
+
         """
         super(TemporalConvNet, self).__init__()
         # Hyper-parameter
@@ -208,8 +209,7 @@ class TemporalConvNet(nn.Module):
         self.network = nn.Sequential(layer_norm, bottleneck_conv1x1, temporal_conv_net, mask_conv1x1)
 
     def forward(self, mixture_w):
-        """
-        Keep this API same with TasNet
+        """Keep this API same with TasNet
         Args:
             mixture_w: [M, N, K], M is batch size
         returns:
@@ -240,11 +240,12 @@ class TemporalBlock(nn.Module):
         self.net = nn.Sequential(conv1x1, prelu, norm, dsconv)
 
     def forward(self, x):
-        """
-        Args:
+        """Args:
             x: [M, B, K]
+
         Returns:
             [M, B, K]
+
         """
         residual = x
         out = self.net(x)
@@ -272,11 +273,12 @@ class DepthwiseSeparableConv(nn.Module):
             self.net = nn.Sequential(depthwise_conv, prelu, norm, pointwise_conv)
 
     def forward(self, x):
-        """
-        Args:
+        """Args:
             x: [M, H, K]
+
         Returns:
             result: [M, B, K]
+
         """
         return self.net(x)
 
@@ -289,11 +291,12 @@ class Chomp1d(nn.Module):
         self.chomp_size = chomp_size
 
     def forward(self, x):
-        """
-        Args:
+        """Args:
             x: [M, H, Kpad]
+
         Returns:
             [M, H, K]
+
         """
         return x[:, :, : -self.chomp_size].contiguous()
 
@@ -304,14 +307,14 @@ def chose_norm(norm_type, channel_size):
     """
     if norm_type == "gLN":
         return GlobalLayerNorm(channel_size)
-    elif norm_type == "cLN":
+    if norm_type == "cLN":
         return ChannelwiseLayerNorm(channel_size)
-    elif norm_type == "id":
+    if norm_type == "id":
         return nn.Identity()
-    else:  # norm_type == "BN":
-        # Given input (M, C, K), nn.BatchNorm1d(C) will accumulate statics
-        # along M and K, so this BN usage is right.
-        return nn.BatchNorm1d(channel_size)
+    # norm_type == "BN":
+    # Given input (M, C, K), nn.BatchNorm1d(C) will accumulate statics
+    # along M and K, so this BN usage is right.
+    return nn.BatchNorm1d(channel_size)
 
 
 # TODO: Use nn.LayerNorm to impl cLN to speed up
@@ -329,11 +332,11 @@ class ChannelwiseLayerNorm(nn.Module):
         self.beta.data.zero_()
 
     def forward(self, y):
-        """
-        Args:
+        """Args:
             y: [M, N, K], M is batch size, N is channel size, K is length
         Returns:
             cLN_y: [M, N, K]
+
         """
         mean = torch.mean(y, dim=1, keepdim=True)  # [M, 1, K]
         var = torch.var(y, dim=1, keepdim=True, unbiased=False)  # [M, 1, K]
@@ -355,11 +358,11 @@ class GlobalLayerNorm(nn.Module):
         self.beta.data.zero_()
 
     def forward(self, y):
-        """
-        Args:
+        """Args:
             y: [M, N, K], M is batch size, N is channel size, K is length
         Returns:
             gLN_y: [M, N, K]
+
         """
         # TODO: in torch 1.0, torch.mean() support dim list
         mean = y.mean(dim=1, keepdim=True).mean(dim=2, keepdim=True)  # [M, 1, 1]

@@ -1,8 +1,5 @@
-from typing import Optional
+
 import torch
-import torch.nn as nn
-from torch import Tensor
-from torch.utils.data import DataLoader
 
 
 def atan2(y, x):
@@ -16,6 +13,7 @@ def atan2(y, x):
 
     Returns:
         Tensor: [shape=y.shape].
+
     """
     pi = 2 * torch.asin(torch.tensor(1.0))
     x += ((x == 0) & (y == 0)) * 1.0
@@ -42,17 +40,18 @@ def _norm(x: torch.Tensor) -> torch.Tensor:
 
     Returns:
         Tensor: shape as x excluding the last dimension.
+
     """
     return torch.abs(x[..., 0]) ** 2 + torch.abs(x[..., 1]) ** 2
 
 
-def _mul_add(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _mul_add(a: torch.Tensor, b: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise multiplication of two complex Tensors described
     through their real and imaginary parts.
-    The result is added to the `out` tensor"""
-
+    The result is added to the `out` tensor
+    """
     # check `out` and allocate it if needed
-    target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape)])
+    target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape, strict=False)])
     if out is None or out.shape != target_shape:
         out = torch.zeros(target_shape, dtype=a.dtype, device=a.device)
     if out is a:
@@ -65,11 +64,12 @@ def _mul_add(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = Non
     return out
 
 
-def _mul(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _mul(a: torch.Tensor, b: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise multiplication of two complex Tensors described
     through their real and imaginary parts
-    can work in place in case out is a only"""
-    target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape)])
+    can work in place in case out is a only
+    """
+    target_shape = torch.Size([max(sa, sb) for (sa, sb) in zip(a.shape, b.shape, strict=False)])
     if out is None or out.shape != target_shape:
         out = torch.zeros(target_shape, dtype=a.dtype, device=a.device)
     if out is a:
@@ -82,10 +82,11 @@ def _mul(a: torch.Tensor, b: torch.Tensor, out: Optional[torch.Tensor] = None) -
     return out
 
 
-def _inv(z: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _inv(z: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise multiplicative inverse of a Tensor with complex
     entries described through their real and imaginary parts.
-    can work in place in case out is z"""
+    can work in place in case out is z
+    """
     ez = _norm(z)
     if out is None or out.shape != z.shape:
         out = torch.zeros_like(z)
@@ -94,10 +95,11 @@ def _inv(z: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
     return out
 
 
-def _conj(z, out: Optional[torch.Tensor] = None) -> torch.Tensor:
+def _conj(z, out: torch.Tensor | None = None) -> torch.Tensor:
     """Element-wise complex conjugate of a Tensor with complex entries
     described through their real and imaginary parts.
-    can work in place in case out is z"""
+    can work in place in case out is z
+    """
     if out is None or out.shape != z.shape:
         out = torch.zeros_like(z)
     out[..., 0] = z[..., 0]
@@ -105,9 +107,8 @@ def _conj(z, out: Optional[torch.Tensor] = None) -> torch.Tensor:
     return out
 
 
-def _invert(M: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor:
-    """
-    Invert 1x1 or 2x2 matrices
+def _invert(M: torch.Tensor, out: torch.Tensor | None = None) -> torch.Tensor:
+    """Invert 1x1 or 2x2 matrices
 
     Will generate errors if the matrices are singular: user must handle this
     through his own regularization schemes.
@@ -119,6 +120,7 @@ def _invert(M: torch.Tensor, out: Optional[torch.Tensor] = None) -> torch.Tensor
     Returns:
         invM (Tensor): [shape=M.shape]
             inverses of M
+
     """
     nb_channels = M.shape[-2]
 
@@ -171,7 +173,7 @@ def expectation_maximization(y: torch.Tensor, x: torch.Tensor, iterations: int =
        prepare the Wiener filters through :func:`wiener_gain` and apply them
        with :func:`apply_filter``.
 
-    References
+    References:
     ----------
     .. [1] S. Uhlich and M. Porcu and F. Giron and M. Enenkl and T. Kemp and
         N. Takahashi and Y. Mitsufuji, "Improving music source separation based
@@ -236,6 +238,7 @@ def expectation_maximization(y: torch.Tensor, x: torch.Tensor, iterations: int =
         It is usually always better in terms of quality to have double
         precision, by e.g. calling :func:`expectation_maximization`
         with ``x.to(torch.float64)``.
+
     """
     # dimensions
     (nb_frames, nb_bins, nb_channels) = x.shape[:-1]
@@ -330,7 +333,7 @@ def wiener(targets_spectrograms: torch.Tensor, mix_stft: torch.Tensor, iteration
     This implementation also allows to specify the epsilon value used for
     regularization. It is based on [1]_, [2]_, [3]_, [4]_.
 
-    References
+    References:
     ----------
     .. [1] S. Uhlich and M. Porcu and F. Giron and M. Enenkl and T. Kemp and
         N. Takahashi and Y. Mitsufuji, "Improving music source separation based
@@ -394,6 +397,7 @@ def wiener(targets_spectrograms: torch.Tensor, mix_stft: torch.Tensor, iteration
         As in :func:`expectation_maximization`, we recommend converting the
         mixture `x` to double precision `torch.float64` *before* calling
         :func:`wiener`.
+
     """
     if softmask:
         # if we use softmask, we compute the ratio mask for all targets and
@@ -432,8 +436,7 @@ def wiener(targets_spectrograms: torch.Tensor, mix_stft: torch.Tensor, iteration
 
 
 def _covariance(y_j):
-    """
-    Compute the empirical covariance for a source.
+    """Compute the empirical covariance for a source.
 
     Args:
         y_j (Tensor): complex stft of the source.
@@ -442,6 +445,7 @@ def _covariance(y_j):
     Returns:
         Cj (Tensor): [shape=(nb_frames, nb_bins, nb_channels, nb_channels, 2)]
             just y_j * conj(y_j.T): empirical covariance for each TF bin.
+
     """
     (nb_frames, nb_bins, nb_channels) = y_j.shape[:-1]
     Cj = torch.zeros((nb_frames, nb_bins, nb_channels, nb_channels, 2), dtype=y_j.dtype, device=y_j.device)
