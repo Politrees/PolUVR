@@ -34,7 +34,7 @@ jobs:
         run: ruff check $(git ls-files '*.py') --fix --target-version py310 --select ALL --no-preview || true
 
       - name: Run Ruff Formatter
-        run: ruff format $(git ls-files '*.py') --target-version py310 --line-length 180 --no-preview || true
+        run: ruff format $(git ls-files '*.py') --target-version py310 --line-length 360 --no-preview || true
 
       - name: Check for changes
         id: changes
