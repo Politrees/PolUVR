@@ -1,0 +1,64 @@
+name: Code Formatter
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.py'
+      - '.github/workflows/code_formatter.yml'
+
+jobs:
+  format_code:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install ruff
+
+      - name: Run Ruff Linter (with auto-fix)
+        run: ruff check $(git ls-files '*.py') --fix --target-version py310 --select ALL --no-preview || true
+
+      - name: Run Ruff Formatter
+        run: ruff format $(git ls-files '*.py') --target-version py310 --line-length 140 --no-preview || true
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Pull Request
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "style(ruff): автоматическое форматирование кода"
+          title: "🎨 Автоматическое форматирование кода"
+          body: |
+            Этот Pull Request был создан автоматически GitHub Actions для применения единых стилей оформления кода.
+
+            🔧 Форматирование выполнено с помощью [`Ruff`](https://github.com/astral-sh/ruff):
+            > - Автоматическое исправление стиля и линтинга (`ruff check --fix`)
+            > - Применение форматтера (`ruff format`)
+
+            ✨ Изменения затрагивают только стиль кода, логика работы не изменена.
+            > Целевая версия Python: **3.10**
+          branch: "formatter/${{ github.ref_name }}"
+          delete-branch: true
