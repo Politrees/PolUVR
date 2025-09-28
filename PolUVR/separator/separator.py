@@ -91,6 +91,7 @@ class Separator:
         sample_rate=44100,
         use_soundfile=False,
         use_autocast=False,
+        use_directml=False,
         mdx_params={
             "hop_length": 1024,
             "segment_size": 256,
@@ -202,6 +203,7 @@ class Separator:
 
         self.use_soundfile = use_soundfile
         self.use_autocast = use_autocast
+        self.use_directml = use_directml
 
         # These are parameters which users may want to configure so we expose them to the top-level Separator class,
         # even though they are specific to a single model architecture
@@ -221,16 +223,14 @@ class Separator:
             self.setup_accelerated_inferencing_device()
 
     def setup_accelerated_inferencing_device(self):
-        """This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available.
-        """
+        """This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available."""
         system_info = self.get_system_info()
         self.check_ffmpeg_installed()
         self.log_onnxruntime_packages()
         self.setup_torch_device(system_info)
 
     def get_system_info(self):
-        """This method logs the system information, including the operating system, CPU archutecture and Python version
-        """
+        """This method logs the system information, including the operating system, CPU archutecture and Python version."""
         os_name = platform.system()
         os_version = platform.version()
         self.logger.info(f"Operating System: {os_name} {os_version}")
@@ -246,8 +246,7 @@ class Separator:
         return system_info
 
     def check_ffmpeg_installed(self):
-        """This method checks if ffmpeg is installed and logs its version.
-        """
+        """This method checks if ffmpeg is installed and logs its version."""
         try:
             ffmpeg_version_output = subprocess.check_output(["ffmpeg", "-version"], text=True)
             first_line = ffmpeg_version_output.splitlines()[0]
@@ -260,11 +259,11 @@ class Separator:
                 raise
 
     def log_onnxruntime_packages(self):
-        """This method logs the ONNX Runtime package versions, including the GPU and Silicon packages if available.
-        """
+        """This method logs the ONNX Runtime package versions, including the GPU and Silicon packages if available."""
         onnxruntime_gpu_package = self.get_package_distribution("onnxruntime-gpu")
         onnxruntime_silicon_package = self.get_package_distribution("onnxruntime-silicon")
         onnxruntime_cpu_package = self.get_package_distribution("onnxruntime")
+        onnxruntime_dml_package = self.get_package_distribution("onnxruntime-directml")
 
         if onnxruntime_gpu_package is not None:
             self.logger.info(f"ONNX Runtime GPU package installed with version: {onnxruntime_gpu_package.version}")
@@ -272,12 +271,14 @@ class Separator:
             self.logger.info(f"ONNX Runtime Silicon package installed with version: {onnxruntime_silicon_package.version}")
         if onnxruntime_cpu_package is not None:
             self.logger.info(f"ONNX Runtime CPU package installed with version: {onnxruntime_cpu_package.version}")
+        if onnxruntime_dml_package is not None:
+            self.logger.info(f"ONNX Runtime DirectML package installed with version: {onnxruntime_dml_package.version}")
 
     def setup_torch_device(self, system_info):
-        """This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available.
-        """
+        """This method sets up the PyTorch and/or ONNX Runtime inferencing device, using GPU hardware acceleration if available."""
         hardware_acceleration_enabled = False
         ort_providers = ort.get_available_providers()
+        has_torch_dml_installed = self.get_package_distribution("torch_directml")
 
         self.torch_device_cpu = torch.device("cpu")
 
@@ -287,6 +288,11 @@ class Separator:
         elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available() and system_info.processor == "arm":
             self.configure_mps(ort_providers)
             hardware_acceleration_enabled = True
+        elif self.use_directml and has_torch_dml_installed:
+            import torch_directml
+            if torch_directml.is_available():
+                self.configure_dml(ort_providers)
+                hardware_acceleration_enabled = True
 
         if not hardware_acceleration_enabled:
             self.logger.info("No hardware acceleration could be configured, running in CPU mode")
@@ -294,8 +300,7 @@ class Separator:
             self.onnx_execution_provider = ["CPUExecutionProvider"]
 
     def configure_cuda(self, ort_providers):
-        """This method configures the CUDA device for PyTorch and ONNX Runtime, if available.
-        """
+        """This method configures the CUDA device for PyTorch and ONNX Runtime, if available."""
         self.logger.info("CUDA is available in Torch, setting Torch device to CUDA")
         self.torch_device = torch.device("cuda")
         if "CUDAExecutionProvider" in ort_providers:
@@ -305,8 +310,7 @@ class Separator:
             self.logger.warning("CUDAExecutionProvider not available in ONNXruntime, so acceleration will NOT be enabled")
 
     def configure_mps(self, ort_providers):
-        """This method configures the Apple Silicon MPS/CoreML device for PyTorch and ONNX Runtime, if available.
-        """
+        """This method configures the Apple Silicon MPS/CoreML device for PyTorch and ONNX Runtime, if available."""
         self.logger.info("Apple Silicon MPS/CoreML is available in Torch and processor is ARM, setting Torch device to MPS")
         self.torch_device_mps = torch.device("mps")
 
@@ -318,9 +322,21 @@ class Separator:
         else:
             self.logger.warning("CoreMLExecutionProvider not available in ONNXruntime, so acceleration will NOT be enabled")
 
+    def configure_dml(self, ort_providers):
+        """This method configures the DirectML device for PyTorch and ONNX Runtime, if available."""
+        import torch_directml
+        self.logger.info("DirectML is available in Torch, setting Torch device to DirectML")
+        self.torch_device_dml = torch_directml.device() 
+        self.torch_device = self.torch_device_dml
+
+        if "DmlExecutionProvider" in ort_providers:
+            self.logger.info("ONNXruntime has DmlExecutionProvider available, enabling acceleration")
+            self.onnx_execution_provider = ["DmlExecutionProvider"]
+        else:
+            self.logger.warning("DmlExecutionProvider not available in ONNXruntime, so acceleration will NOT be enabled")
+
     def get_package_distribution(self, package_name):
-        """This method returns the package distribution for a given package name if installed, or None otherwise.
-        """
+        """This method returns the package distribution for a given package name if installed, or None otherwise."""
         try:
             return metadata.distribution(package_name)
         except metadata.PackageNotFoundError:
@@ -328,8 +344,7 @@ class Separator:
             return None
 
     def get_model_hash(self, model_path):
-        """This method returns the MD5 hash of a given model file.
-        """
+        """This method returns the MD5 hash of a given model file."""
         self.logger.debug(f"Calculating hash of model file {model_path}")
 
         # Use the specific byte count from the original logic
@@ -361,8 +376,8 @@ class Separator:
             raise # Re-raise other errors
 
     def download_file_if_not_exists(self, url, output_path):
-        """This method downloads a file from a given URL to a given output path, if the file does not already exist.
-        """
+        """This method downloads a file from a given URL to a given output path, if the file does not already exist."""
+
         if os.path.isfile(output_path):
             self.logger.debug(f"File already exists at {output_path}, skipping download")
             return
@@ -467,8 +482,7 @@ class Separator:
         return model_files_grouped_by_type
 
     def print_uvr_vip_message(self):
-        """This method prints a message to the user if they have downloaded a VIP model, reminding them to support Anjok07 on Patreon.
-        """
+        """This method prints a message to the user if they have downloaded a VIP model, reminding them to support Anjok07 on Patreon."""
         if self.model_is_uvr_vip:
             self.logger.warning(f"The model: '{self.model_friendly_name}' is a VIP model, intended by Anjok07 for access by paying subscribers only.")
             self.logger.warning("If you are not already subscribed, please consider supporting the developer of UVR, Anjok07 by subscribing here: https://patreon.com/uvr")
@@ -527,7 +541,7 @@ class Separator:
         model_data = yaml.load(open(model_data_yaml_filepath, encoding="utf-8"), Loader=yaml.FullLoader)
         self.logger.debug(f"Model data loaded from YAML file: {model_data}")
 
-        if "roformer" in model_data_yaml_filepath:
+        if "roformer" in model_data_yaml_filepath.lower():
             model_data["is_roformer"] = True
 
         return model_data
@@ -573,7 +587,7 @@ class Separator:
 
         return model_data
 
-    def load_model(self, model_filename="model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt"):
+    def load_model(self, model_filename="model_bs_roformer_ep_317_sdr_12.9755.ckpt"):
         """This method instantiates the architecture-specific separation class,
         loading the separation model into memory, downloading it first if necessary.
         """
@@ -624,7 +638,13 @@ class Separator:
         }
 
         if model_type not in self.arch_specific_params or model_type not in separator_classes:
-            raise ValueError(f"Model type not supported (yet): {model_type}")
+            # Enhanced error message for Roformer models
+            if "roformer" in model_filename.lower() or (model_data and model_data.get("is_roformer", False)):
+                error_msg = (f"Roformer model type not properly configured: {model_type}. This may indicate a configuration validation failure. Please check the model file and YAML configuration.")
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            else:
+                raise ValueError(f"Model type not supported (yet): {model_type}")
 
         if model_type == "Demucs" and sys.version_info < (3, 10):
             raise Exception("Demucs models require Python version 3.10 or newer.")
@@ -636,8 +656,24 @@ class Separator:
         separator_class = getattr(module, class_name)
 
         self.logger.debug(f"Instantiating separator class for model type {model_type}: {separator_class}")
-        self.model_instance = separator_class(common_config=common_params, arch_config=self.arch_specific_params[model_type])
+        
+        try:
+            self.model_instance = separator_class(common_config=common_params, arch_config=self.arch_specific_params[model_type])
+        except Exception as e:
+            # Enhanced error handling for Roformer models
+            if "roformer" in model_filename.lower() or (model_data and model_data.get("is_roformer", False)):
+                error_msg = (f"Failed to instantiate Roformer model: {e}. This may be due to missing parameters or configuration validation failures.")
+                self.logger.error(error_msg)
+                raise RuntimeError(error_msg) from e
+            else:
+                raise
 
+        # Log Roformer implementation version if applicable
+        if hasattr(self.model_instance, 'is_roformer_model') and self.model_instance.is_roformer_model:
+            roformer_stats = self.model_instance.get_roformer_loading_stats()
+            if roformer_stats:
+                self.logger.info(f"Roformer loading stats: {roformer_stats}")
+                
         # Log the completion of the model load process
         self.logger.debug("Loading model completed.")
         self.logger.info(f'Load model duration: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - load_model_start_time)))}')
@@ -747,8 +783,7 @@ class Separator:
         return output_files
 
     def download_model_and_data(self, model_filename):
-        """Downloads the model file without loading it into memory.
-        """
+        """Downloads the model file without loading it into memory."""
         self.logger.info(f"Downloading model {model_filename}...")
 
         model_filename, model_type, model_friendly_name, model_path, yaml_config_filename = self.download_model_files(model_filename)
