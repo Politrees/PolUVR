@@ -30,6 +30,7 @@ PolUVR --env_info
 | **Command**                 | **Expected Log Message**                                                   |
 |-----------------------------|----------------------------------------------------------------------------|
 | `pip install "PolUVR[gpu]"` | `ONNXruntime has CUDAExecutionProvider available, enabling acceleration`   |
+| `pip install "PolUVR[dml]"` | `ONNXruntime has DmlExecutionProvider available, enabling acceleration`    |
 | `pip install "PolUVR[cpu]"` | `ONNXruntime has CoreMLExecutionProvider available, enabling acceleration` |
 | `pip install "PolUVR[cpu]"` | No hardware acceleration enabled                                           |
 
