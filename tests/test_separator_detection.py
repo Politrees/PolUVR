@@ -1,12 +1,10 @@
-"""
-Unit tests for separator detection and routing logic.
+"""Unit tests for separator detection and routing logic.
 Tests the detection of Roformer models and proper routing.
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 import os
 import tempfile
+from unittest.mock import Mock, patch
 
 
 class TestSeparatorDetection:
@@ -41,10 +39,10 @@ class TestSeparatorDetection:
             def mock_detect_roformer_from_path(path):
                 """Mock detection that checks if path contains 'roformer'."""
                 path_lower = path.lower()
-                return 'roformer' in path_lower
+                return "roformer" in path_lower
 
             is_roformer = mock_detect_roformer_from_path(yaml_path)
-            
+
             assert is_roformer == expected_is_roformer, (
                 f"Failed for {description}: path '{yaml_path}' should "
                 f"{'be' if expected_is_roformer else 'not be'} detected as Roformer"
@@ -54,26 +52,25 @@ class TestSeparatorDetection:
         def mock_route_separator(yaml_path):
             """Mock routing logic that selects separator based on detection."""
             is_roformer = mock_detect_roformer_from_path(yaml_path)
-            
+
             if is_roformer:
                 # In current routing, Roformer models are handled via MDXCSeparator path
                 return "MDXCSeparator"
-            elif 'mdx' in yaml_path.lower():
+            if "mdx" in yaml_path.lower():
                 return "MDXSeparator"
-            elif 'vr' in yaml_path.lower():
+            if "vr" in yaml_path.lower():
                 return "VRSeparator"
-            elif 'demucs' in yaml_path.lower():
+            if "demucs" in yaml_path.lower():
                 return "DemucsSeparator"
-            else:
-                return "DefaultSeparator"
+            return "DefaultSeparator"
 
         # Test routing for Roformer models
         roformer_paths = [
             "model_bs_roformer_ep_317_sdr_12.yaml",
             "mel_band_roformer_vocals.yaml",
-            "BS-Roformer-Viperx-1297.yaml"
+            "BS-Roformer-Viperx-1297.yaml",
         ]
-        
+
         for path in roformer_paths:
             separator_type = mock_route_separator(path)
             assert separator_type == "MDXCSeparator", (
@@ -87,7 +84,7 @@ class TestSeparatorDetection:
             ("demucs_model.yaml", "DemucsSeparator"),
             ("some_other_model.yaml", "DefaultSeparator"),
         ]
-        
+
         for path, expected_separator in non_roformer_cases:
             separator_type = mock_route_separator(path)
             assert separator_type == expected_separator, (
@@ -98,19 +95,19 @@ class TestSeparatorDetection:
         """Test that Roformer detection is case-insensitive."""
         case_variations = [
             "ROFORMER_MODEL.yaml",
-            "roformer_model.yaml", 
+            "roformer_model.yaml",
             "RoFormer_Model.yaml",
             "BS_ROFORMER.yaml",
             "bs_roformer.yaml",
             "Bs_Roformer.yaml",
             "MEL_BAND_ROFORMER.yaml",
             "mel_band_roformer.yaml",
-            "Mel_Band_Roformer.yaml"
+            "Mel_Band_Roformer.yaml",
         ]
 
         def mock_detect_roformer_case_insensitive(path):
             """Mock detection with case-insensitive matching."""
-            return 'roformer' in path.lower()
+            return "roformer" in path.lower()
 
         for path in case_variations:
             is_roformer = mock_detect_roformer_case_insensitive(path)
@@ -130,7 +127,7 @@ class TestSeparatorDetection:
         def mock_detect_roformer_full_path(full_path):
             """Mock detection that works with full paths."""
             filename = os.path.basename(full_path)
-            return 'roformer' in filename.lower()
+            return "roformer" in filename.lower()
 
         for full_path, expected_result in full_path_cases:
             is_roformer = mock_detect_roformer_full_path(full_path)
@@ -158,56 +155,55 @@ class TestSeparatorDetection:
         def mock_detect_roformer_from_config(config):
             """Mock detection based on configuration content."""
             config_str = str(config).lower()
-            return 'roformer' in config_str
+            return "roformer" in config_str
 
         # Test Roformer configs
         for config in roformer_configs:
             is_roformer = mock_detect_roformer_from_config(config)
             assert is_roformer, f"Roformer config should be detected: {config}"
 
-        # Test non-Roformer configs  
+        # Test non-Roformer configs
         for config in non_roformer_configs:
             is_roformer = mock_detect_roformer_from_config(config)
             assert not is_roformer, f"Non-Roformer config should not be detected: {config}"
 
     def test_roformer_routing_integration(self):
         """Test integration between detection and routing."""
-        with patch('PolUVR.separator.separator.Separator') as mock_separator_class:
+        with patch("PolUVR.separator.separator.Separator") as mock_separator_class:
             mock_instance = Mock()
             mock_separator_class.return_value = mock_instance
-            
+
             # Mock the routing logic
             def mock_load_model_with_routing(model_path):
                 """Mock model loading that routes based on detection."""
                 filename = os.path.basename(model_path)
-                is_roformer = 'roformer' in filename.lower()
-                
+                is_roformer = "roformer" in filename.lower()
+
                 if is_roformer:
                     # Should use Roformer-specific loading
                     return {
-                        'separator_type': 'RoformerSeparator',
-                        'is_roformer': True,
-                        'routing_path': 'roformer_path'
+                        "separator_type": "RoformerSeparator",
+                        "is_roformer": True,
+                        "routing_path": "roformer_path",
                     }
-                else:
-                    # Should use default loading
-                    return {
-                        'separator_type': 'DefaultSeparator', 
-                        'is_roformer': False,
-                        'routing_path': 'default_path'
-                    }
+                # Should use default loading
+                return {
+                    "separator_type": "DefaultSeparator",
+                    "is_roformer": False,
+                    "routing_path": "default_path",
+                }
 
             # Test Roformer model routing
             roformer_result = mock_load_model_with_routing("model_bs_roformer_ep_317.ckpt")
-            assert roformer_result['is_roformer'] is True
-            assert roformer_result['separator_type'] == 'RoformerSeparator'
-            assert roformer_result['routing_path'] == 'roformer_path'
+            assert roformer_result["is_roformer"] is True
+            assert roformer_result["separator_type"] == "RoformerSeparator"
+            assert roformer_result["routing_path"] == "roformer_path"
 
             # Test non-Roformer model routing
             mdx_result = mock_load_model_with_routing("model_mdx_extra_vocals.ckpt")
-            assert mdx_result['is_roformer'] is False
-            assert mdx_result['separator_type'] == 'DefaultSeparator'
-            assert mdx_result['routing_path'] == 'default_path'
+            assert mdx_result["is_roformer"] is False
+            assert mdx_result["separator_type"] == "DefaultSeparator"
+            assert mdx_result["routing_path"] == "default_path"
 
     def test_roformer_detection_edge_cases(self):
         """Test edge cases in Roformer detection."""
@@ -228,7 +224,7 @@ class TestSeparatorDetection:
             """Mock detection handling edge cases."""
             if not path:
                 return False
-            return 'roformer' in path.lower()
+            return "roformer" in path.lower()
 
         for path, expected_result, description in edge_cases:
             is_roformer = mock_detect_roformer_edge_cases(path)
@@ -239,14 +235,14 @@ class TestSeparatorDetection:
 
     def test_roformer_detection_with_model_extensions(self):
         """Test Roformer detection works with various model file extensions."""
-        model_extensions = ['.ckpt', '.pth', '.pt', '.onnx', '.yaml', '.yml']
-        base_names = ['bs_roformer_model', 'mel_band_roformer', 'roformer_large']
+        model_extensions = [".ckpt", ".pth", ".pt", ".onnx", ".yaml", ".yml"]
+        base_names = ["bs_roformer_model", "mel_band_roformer", "roformer_large"]
 
         def mock_detect_roformer_with_extension(path):
             """Mock detection that ignores file extension."""
             filename = os.path.basename(path)
             name_without_ext = os.path.splitext(filename)[0]
-            return 'roformer' in name_without_ext.lower()
+            return "roformer" in name_without_ext.lower()
 
         for base_name in base_names:
             for ext in model_extensions:
@@ -257,7 +253,7 @@ class TestSeparatorDetection:
                 )
 
         # Test non-Roformer models with same extensions
-        non_roformer_bases = ['mdx_model', 'vr_vocals', 'demucs_v4']
+        non_roformer_bases = ["mdx_model", "vr_vocals", "demucs_v4"]
         for base_name in non_roformer_bases:
             for ext in model_extensions:
                 full_filename = f"{base_name}{ext}"

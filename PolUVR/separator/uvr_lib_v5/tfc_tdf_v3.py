@@ -160,15 +160,15 @@ class TFC_TDF_net(nn.Module):
         except (AttributeError, KeyError):
             norm_type = None
             print("Warning: Model configuration missing 'norm' attribute, using Identity normalization")
-        
+
         norm = get_norm(norm_type=norm_type)
-        
+
         try:
             act_type = config.model.act
         except (AttributeError, KeyError):
             act_type = "gelu"
             print("Warning: Model configuration missing 'act' attribute, using GELU activation")
-            
+
         act = get_act(act_type=act_type)
 
         self.num_target_instruments = 1 if config.training.target_instrument else len(config.training.instruments)

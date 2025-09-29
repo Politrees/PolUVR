@@ -10,6 +10,7 @@ from tqdm import tqdm
 from PolUVR.separator.common_separator import CommonSeparator
 from PolUVR.separator.uvr_lib_v5 import spec_utils
 from PolUVR.separator.uvr_lib_v5.tfc_tdf_v3 import TFC_TDF_net
+
 # Roformer direct constructors removed; loading handled via RoformerLoader in CommonSeparator.
 
 
@@ -135,7 +136,7 @@ class MDXCSeparator(CommonSeparator):
                 self.logger.debug("Loading TFC_TDF_net model...")
                 self.model_run = TFC_TDF_net(self.model_data_cfgdict, device=self.torch_device)
                 self.logger.debug("Loading model onto cpu")
-                # For some reason loading the state onto a hardware accelerated devices causes issues, 
+                # For some reason loading the state onto a hardware accelerated devices causes issues,
                 # so we load it onto CPU first then move it to the device
                 self.model_run.load_state_dict(torch.load(self.model_path, map_location="cpu"))
                 self.model_run.to(self.torch_device).eval()

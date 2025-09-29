@@ -326,7 +326,7 @@ class Separator:
         """This method configures the DirectML device for PyTorch and ONNX Runtime, if available."""
         import torch_directml
         self.logger.info("DirectML is available in Torch, setting Torch device to DirectML")
-        self.torch_device_dml = torch_directml.device() 
+        self.torch_device_dml = torch_directml.device()
         self.torch_device = self.torch_device_dml
 
         if "DmlExecutionProvider" in ort_providers:
@@ -377,7 +377,6 @@ class Separator:
 
     def download_file_if_not_exists(self, url, output_path):
         """This method downloads a file from a given URL to a given output path, if the file does not already exist."""
-
         if os.path.isfile(output_path):
             self.logger.debug(f"File already exists at {output_path}, skipping download")
             return
@@ -643,8 +642,7 @@ class Separator:
                 error_msg = (f"Roformer model type not properly configured: {model_type}. This may indicate a configuration validation failure. Please check the model file and YAML configuration.")
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
-            else:
-                raise ValueError(f"Model type not supported (yet): {model_type}")
+            raise ValueError(f"Model type not supported (yet): {model_type}")
 
         if model_type == "Demucs" and sys.version_info < (3, 10):
             raise Exception("Demucs models require Python version 3.10 or newer.")
@@ -656,7 +654,7 @@ class Separator:
         separator_class = getattr(module, class_name)
 
         self.logger.debug(f"Instantiating separator class for model type {model_type}: {separator_class}")
-        
+
         try:
             self.model_instance = separator_class(common_config=common_params, arch_config=self.arch_specific_params[model_type])
         except Exception as e:
@@ -665,15 +663,14 @@ class Separator:
                 error_msg = (f"Failed to instantiate Roformer model: {e}. This may be due to missing parameters or configuration validation failures.")
                 self.logger.error(error_msg)
                 raise RuntimeError(error_msg) from e
-            else:
-                raise
+            raise
 
         # Log Roformer implementation version if applicable
-        if hasattr(self.model_instance, 'is_roformer_model') and self.model_instance.is_roformer_model:
+        if hasattr(self.model_instance, "is_roformer_model") and self.model_instance.is_roformer_model:
             roformer_stats = self.model_instance.get_roformer_loading_stats()
             if roformer_stats:
                 self.logger.info(f"Roformer loading stats: {roformer_stats}")
-                
+
         # Log the completion of the model load process
         self.logger.debug("Loading model completed.")
         self.logger.info(f'Load model duration: {time.strftime("%H:%M:%S", time.gmtime(int(time.perf_counter() - load_model_start_time)))}')

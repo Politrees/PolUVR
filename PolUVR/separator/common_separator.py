@@ -83,7 +83,7 @@ class CommonSeparator:
         self.invert_using_spec = config.get("invert_using_spec")
         self.sample_rate = config.get("sample_rate")
         self.use_soundfile = config.get("use_soundfile")
-        
+
         # Roformer-specific loading support
         self.roformer_loader = None
         self.is_roformer_model = self._detect_roformer_model()
@@ -192,7 +192,7 @@ class CommonSeparator:
         """Update the dictionary for the given model_architecture with the new model name and its sources.
         Use the model_architecture as a key to access the corresponding cache source mapper dictionary.
         """
-        self.cached_sources_map[model_architecture] = {**self.cached_sources_map.get(model_architecture, {}), **{model_name: sources}}
+        self.cached_sources_map[model_architecture] = {**self.cached_sources_map.get(model_architecture, {}), model_name: sources}
 
     def prepare_mix(self, mix):
         """Prepares the mix for processing. This includes loading the audio from a file if necessary,
@@ -396,30 +396,31 @@ class CommonSeparator:
 
         filename = f"{sanitized_audio_base}_({sanitized_stem_name})_{sanitized_model_name}.{self.output_format.lower()}"
         return os.path.join(filename)
-    
+
     def _detect_roformer_model(self):
         """Detect if the current model is a Roformer model.
         
         Returns:
             bool: True if this is a Roformer model, False otherwise
+
         """
         if not self.model_data:
             return False
-            
+
         # Check for explicit Roformer flag
         if self.model_data.get("is_roformer", False):
             return True
-            
+
         # Check model path for Roformer indicators
         if self.model_path and "roformer" in self.model_path.lower():
             return True
-            
+
         # Check model name for Roformer indicators
         if self.model_name and "roformer" in self.model_name.lower():
             return True
-            
+
         return False
-    
+
     def _initialize_roformer_loader(self):
         """Initialize the Roformer loader for this model."""
         try:
@@ -429,17 +430,18 @@ class CommonSeparator:
         except ImportError as e:
             self.logger.warning(f"Could not import RoformerLoader: {e}")
             self.roformer_loader = None
-    
+
     def get_roformer_loading_stats(self):
         """Get Roformer loading statistics if available.
         
         Returns:
             dict: Loading statistics or empty dict if not available
+
         """
         if self.roformer_loader:
             return self.roformer_loader.get_loading_stats()
         return {}
-    
+
     def validate_roformer_config(self, config, model_type):
         """Validate Roformer configuration if loader is available.
         
@@ -449,6 +451,7 @@ class CommonSeparator:
             
         Returns:
             bool: True if valid or validation not available, False if invalid
+
         """
         if self.roformer_loader:
             return self.roformer_loader.validate_configuration(config, model_type)

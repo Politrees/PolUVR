@@ -338,7 +338,7 @@ class BSRoformer(Module):
         self.stereo = stereo
         self.audio_channels = 2 if stereo else 1
         self.num_stems = num_stems
-        
+
         # Store new parameters as instance variables
         self.mlp_expansion_factor = mlp_expansion_factor
         self.sage_attention = sage_attention
@@ -350,7 +350,7 @@ class BSRoformer(Module):
 
         # Add parameters to transformer kwargs (excluding sage_attention for now)
         transformer_kwargs = dict(dim=dim, heads=heads, dim_head=dim_head, attn_dropout=attn_dropout, ff_dropout=ff_dropout, flash_attn=flash_attn, norm_output=False)
-        
+
         # Print sage attention status if enabled (as per research findings)
         if sage_attention:
             print("Use Sage Attention")
@@ -385,10 +385,10 @@ class BSRoformer(Module):
 
         for _ in range(num_stems):
             mask_estimator = MaskEstimator(
-                dim=dim, 
-                dim_inputs=freqs_per_bands_with_complex, 
+                dim=dim,
+                dim_inputs=freqs_per_bands_with_complex,
                 depth=mask_estimator_depth,
-                mlp_expansion_factor=mlp_expansion_factor  # Use the new parameter
+                mlp_expansion_factor=mlp_expansion_factor,  # Use the new parameter
             )
 
             self.mask_estimators.append(mask_estimator)
