@@ -7,51 +7,33 @@ from typing import Dict, Any, List, Optional, Union, Tuple
 import sys
 import os
 
-# Add contracts to path for interface imports (optional)
-try:
-    # Find project root dynamically
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = current_dir
-    # Go up until we find the project root (contains specs/ directory)
-    while project_root and not os.path.exists(os.path.join(project_root, 'specs')):
-        parent = os.path.dirname(project_root)
-        if parent == project_root:  # Reached filesystem root
-            break
-        project_root = parent
-    
-    contracts_path = os.path.join(project_root, 'specs', '001-update-roformer-implementation', 'contracts')
-    if os.path.exists(contracts_path):
-        sys.path.append(contracts_path)
-    from parameter_validator_interface import (
-        ParameterValidatorInterface,
-        ValidationIssue,
-        ValidationSeverity
-    )
-    _has_interface = True
-except ImportError:
-    # Create dummy interfaces for when contracts are not available
-    from enum import Enum
-    from dataclasses import dataclass
-    
-    class ValidationSeverity(Enum):
-        ERROR = "error"
-        WARNING = "warning"
-        INFO = "info"
-    
-    @dataclass
-    class ValidationIssue:
-        severity: ValidationSeverity
-        parameter_name: str
-        message: str
-        suggested_fix: str
-        current_value: any = None
-        expected_value: any = None
-    
-    class ParameterValidatorInterface:
-        pass
-    
-    _has_interface = False
+from enum import Enum
+from dataclasses import dataclass
+
 from .parameter_validation_error import ParameterValidationError
+
+
+class ValidationSeverity(Enum):
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
+
+
+@dataclass
+class ValidationIssue:
+    severity: ValidationSeverity
+    parameter_name: str
+    message: str
+    suggested_fix: str
+    current_value: any = None
+    expected_value: any = None
+
+
+class ParameterValidatorInterface:
+    pass
+
+
+_has_interface = False
 
 
 class ParameterValidator(ParameterValidatorInterface):
