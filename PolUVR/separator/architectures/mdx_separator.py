@@ -286,7 +286,7 @@ class MDXSeparator(CommonSeparator):
                     np.zeros((2, pad), dtype="float32"),        # Pad in the middle (to match chunk size)
                     np.zeros((2, self.trim), dtype="float32"),  # Pad at the end
                 ),
-                1
+                1,
             )
             # Determine the number of chunks based on the mixture's length
             num_chunks = mixture.shape[-1] // self.gen_size

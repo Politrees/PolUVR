@@ -1,6 +1,5 @@
 import json
 import logging
-import subprocess
 from unittest import mock
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -41,7 +40,7 @@ def test_cli_version_subprocess():
 
 # Test the CLI with no arguments
 def test_cli_no_args(capsys):
-    # Skip subprocess CLI tests - require proper CLI installation  
+    # Skip subprocess CLI tests - require proper CLI installation
     pytest.skip("CLI subprocess tests require proper installation")
 
 

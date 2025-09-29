@@ -229,7 +229,7 @@ class MelBandRoformer(Module):
         self.stereo = stereo
         self.audio_channels = 2 if stereo else 1
         self.num_stems = num_stems
-        
+
         # Store new parameters as instance variables
         self.mlp_expansion_factor = mlp_expansion_factor
         self.sage_attention = sage_attention
@@ -241,7 +241,7 @@ class MelBandRoformer(Module):
 
         # Add parameters to transformer kwargs (excluding sage_attention for now)
         transformer_kwargs = dict(dim=dim, heads=heads, dim_head=dim_head, attn_dropout=attn_dropout, ff_dropout=ff_dropout, flash_attn=flash_attn)
-        
+
         # Print sage attention status if enabled (as per research findings)
         if sage_attention:
             print("Use Sage Attention")
