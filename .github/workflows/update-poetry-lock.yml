@@ -10,10 +10,6 @@ on:
         type: boolean
         default: false
 
-  push:
-    paths:
-      - .github/workflows/update-poetry-lock.yml
-
 permissions:
   contents: write
 
