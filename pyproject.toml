@@ -4,7 +4,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "PolUVR"
-version = "1.11.0"
+version = "1.12.0"
 description = "Easy to use audio stem separation with a UI, using various models from UVR trained primarily by @Anjok07"
 authors = ["Politrees <artyom.0.bebroy@gmail.com>"]
 license = "MIT"
@@ -56,6 +56,7 @@ resampy = ">=0.4"
 beartype = "^0.18.5"
 rotary-embedding-torch = "^0.6.1"
 scipy = "^1.13.0"
+soundfile = ">=0.12"
 gradio = "<=5.35.0"
 UVR_resources = "*"
 
@@ -70,5 +71,13 @@ PolUVR-app = 'PolUVR.utils.app:main'
 PolUVR-ffmpeg = 'tools.install_ffmpeg:main'
 
 [tool.poetry.group.dev.dependencies]
+black = ">=23"
 pytest = "*"
-pytest-cov = "^4.1.0"
+pytest-cov = ">=4.1.0"
+matplotlib = ">=3.8.0"
+pillow = ">=10.1.0"
+scikit-image = ">=0.22.0"
+filetype = ">=1"
+
+[tool.black]
+line-length = 140
