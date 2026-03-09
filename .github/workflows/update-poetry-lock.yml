@@ -1,0 +1,62 @@
+# .github/workflows/update-poetry-lock.yml
+name: Update poetry.lock
+
+on:
+  workflow_dispatch:
+    inputs:
+      auto_commit:
+        description: "Автоматически закоммитить poetry.lock в текущую ветку"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  update-lock:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Poetry
+        run: |
+          pipx install poetry
+
+      - name: Remove stale lock (if exists)
+        run: |
+          rm -f poetry.lock
+
+      - name: Generate poetry.lock
+        run: |
+          poetry lock --no-update
+          echo "--- poetry.lock generated successfully ---"
+
+      - name: Upload poetry.lock as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: poetry-lock-${{ github.ref_name }}-${{ github.run_id }}
+          path: poetry.lock
+          retention-days: 30
+
+      - name: Commit & push poetry.lock
+        if: ${{ inputs.auto_commit }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add poetry.lock
+
+          if git diff --cached --quiet; then
+            echo "poetry.lock не изменился — коммит не нужен."
+          else
+            git commit -m "chore: update poetry.lock [skip ci]"
+            git push
+          fi
