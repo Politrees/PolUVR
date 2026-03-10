@@ -29,7 +29,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11"
+python = ">=3.11,<3.14"
 requests = ">=2"
 numpy = ">=1.23"
 librosa = ">=0.10"
